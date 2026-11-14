@@ -242,6 +242,13 @@ def create_app(path=None):
                 fail("다른 화면에서 변경했습니다. 새로고침하세요.", 409)
             row_id = edit.id
         else:
+            if kind == "members":
+                # Keep deleted member IDs reserved so a stale editor cannot target a new member.
+                last_deleted = select(func.coalesce(func.max(store.audit.c.target), 0)).where(
+                    store.audit.c.entity == "members", store.audit.c.reason == "회원사 삭제",
+                ).scalar_subquery()
+                last_member = select(func.coalesce(func.max(table.c.id), 0)).scalar_subquery()
+                record["id"] = func.max(last_member, last_deleted) + 1
             row_id = conn.execute(table.insert().values(**record)).inserted_primary_key[0]
         row = dict(values, id=row_id, revision=revision)
         if kind == "lines":
@@ -275,6 +282,18 @@ def create_app(path=None):
             if updated.rowcount != 1:
                 fail("자료를 다시 불러오세요.", 409)
             store.log(conn, org, actor(request), "lines", row_id, reason[:500], row.data, None)
+        return {"ok": True}
+
+    @app.delete("/api/org/{org}/data/members/{row_id}")
+    def delete_member(org: int, row_id: int, revision: int, request: Request):
+        table = store.memberships
+        with db.begin() as conn:
+            deleted = conn.execute(table.delete().where(
+                table.c.org == org, table.c.id == row_id, table.c.revision == revision,
+            ).returning(table.c.data)).first()
+            if deleted is None:
+                fail("회원사 명부가 변경되었습니다. 새로고침 후 다시 확인하세요.", 409)
+            store.log(conn, org, actor(request), "members", row_id, "회원사 삭제", deleted.data, None)
         return {"ok": True}
 
     @app.post("/api/org/{org}/data/lines/reset")
@@ -321,21 +340,47 @@ def create_app(path=None):
             else:
                 file_id = conn.execute(select(table.c.id).where(table.c.org == org, table.c.sha == sha,
                                                                table.c.kind == kind)).scalar_one()
-                lines, sources = store.declarations, store.import_rows
+            sources = store.import_rows
+            previous_sources = {}
+            if not new.rowcount and kind == "lines":
+                lines = store.declarations
                 active = conn.execute(select(lines.c.id).join(sources, lines.c.source == sources.c.id)
                                       .where(sources.c.file == file_id, lines.c.deleted == 0).limit(1)).first()
-                if kind != "lines" or active:
+                if active:
                     fail("D081 같은 원본 파일을 이미 가져왔습니다.", 409)
+            elif not new.rowcount:
+                previous_sources = dict(conn.execute(select(sources.c.row, sources.c.id)
+                                        .where(sources.c.file == file_id, sources.c.sheet == sheet_name)).tuples().all())
             index = member_index(conn, org)
             rejected = []
-            for row_index, values in rows:
-                source = conn.execute(store.import_rows.insert().values(file=file_id, sheet=sheet_name,
-                                      row=row_index, original=values)).inserted_primary_key[0]
+            imported = skipped = needs_review = 0
+            for row_index, original in rows:
+                source = previous_sources.get(row_index)
+                values = original
+                if kind == "members":
+                    if source is not None and rules.business_number(original.get("number")) in index:
+                        skipped += 1
+                        continue
+                    values = dict(original)
+                    member_kind = values.get("kind")
+                    values["kind"] = {"생산": "생산자", "수출": "수출업체"}.get(member_kind, member_kind or "")
+                    if values.get("email") == "개인우편":
+                        values["email"] = ""
+                if source is None:
+                    source = conn.execute(sources.insert().values(file=file_id, sheet=sheet_name,
+                                          row=row_index, original=original)).inserted_primary_key[0]
                 result = save(conn, org, kind, Edit(values=values, reason=f"Excel 가져오기 ({source})"), user, source, index)
-                if "row" not in result:
+                if "row" in result:
+                    imported += 1
+                    if any(problem["severity"] != "INFO" for problem in result["issues"]):
+                        needs_review += 1
+                else:
                     rejected.append(dict(row=row_index, issues=result["issues"]))
-            store.log(conn, org, user, "Excel", file_id, "원본 저장", None, dict(name=name, sha=sha, rows=len(rows)))
-        return dict(imported=len(rows) - len(rejected), rejected=rejected, profile=profile)
+            if new.rowcount or kind == "lines" or imported:
+                store.log(conn, org, user, "Excel", file_id, "원본 저장" if new.rowcount or kind == "lines" else "원본 재처리",
+                          None, dict(name=name, sha=sha, rows=len(rows), imported=imported))
+        summary = {"skipped": skipped} if kind == "members" else {"needs_review": needs_review}
+        return dict(imported=imported, rejected=rejected, profile=profile, **summary)
 
     ocr_path = "/api/org/{org}/ocr"
 
@@ -501,7 +546,9 @@ def create_app(path=None):
                     row["issues"] = "\n".join(p["code"] + " " + p["message"] for p in issues)
             fields = FIELDS[kind] | ({"source": "원본 행 ID", "issues": "검증 결과"} if kind == "lines" and not template else {})
         title = "회원사명부" if kind == "members" else "수출신고필증원장"
-        return download(books.workbook([(title, fields, rows)]), f"{title}_{name}.xlsx")
+        member_template = kind == "members" and template
+        filename = f"{title}_표준양식_{name}.xlsx" if member_template else f"{title}_{name}.xlsx"
+        return download(books.workbook([(title, fields, rows)], member_template=member_template), filename)
 
     @app.get("/api/org/{org}/policies")
     def policies(org: int):

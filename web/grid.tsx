@@ -179,7 +179,7 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
     await Promise.all([query.refetch(), ...(kind==='lines' ? [checks.refetch()] : [])])
   }
   const save = async () => {
-    if (kind==='lines' && hasInvalidIdentity(draft)) {
+    if (kind==='lines' && !draft.id && hasInvalidIdentity(draft)) {
       setShowIdentity(true)
       setMessage('품목란 번호와 정정 버전을 확인한 후 저장하세요.')
       await validate(draft)
@@ -192,7 +192,8 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
     const saved = {...result.row, pdf:draft.pdf}
     setDraft(saved)
     setSelected(saved)
-    setMessage('저장됨 · ' + new Date().toLocaleTimeString('ko-KR'))
+    const needsReview = kind==='lines' && result.issues.some(issue=>issue.severity!=='INFO')
+    setMessage(needsReview ? '저장됨 · 보완이 필요한 항목이 남아 있습니다.' : '저장됨 · ' + new Date().toLocaleTimeString('ko-KR'))
     await reload()
   }
   const upload = async (file: File) => {
@@ -200,7 +201,11 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
     const response = await request(`org/${org}/import/${kind}?${params}`, {method:'POST', body:file})
     const result = await response.json()
     setIssueRows(result.rejected)
-    setMessage(`${result.profile} 양식 · ${result.imported}행 저장 · ${result.rejected.length}행 보완 필요`)
+    if (result.imported) setSearch('')
+    const skipped = result.skipped ? ` · 이미 등록된 사업자번호 ${result.skipped}행 건너뜀` : ''
+    setMessage(kind==='lines'
+      ? `${result.profile} 양식 · ${result.imported}행 원장 등록 · 등록된 행 중 ${result.needs_review}행 보완 필요`
+      : `${result.profile} 양식 · ${result.imported}행 저장 · ${result.rejected.length}행 보완 필요${skipped}`)
     await reload()
   }
   return <section className="ledger-workspace">
@@ -232,16 +237,16 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
         {label}</label>)}</div>
     </details>
     <div className="ledger-status"><span>{visibleRows.length.toLocaleString('ko-KR')}행</span>
-      <span role="status">{busy ? '처리 중…' : dirty ? '저장 전 변경사항' : message || (query.isError || checks.isError ? '자료를 불러오지 못했습니다.' : '행을 선택하여 수정할 수 있습니다.')}</span>
+      <span role="status">{busy ? '처리 중…' : message || (dirty ? '저장 전 변경사항' : query.isError || checks.isError ? '자료를 불러오지 못했습니다.' : '행을 선택하여 수정할 수 있습니다.')}</span>
     </div>
-    {!!issueRows.length && <details className="compact"><summary>일괄 입력 검증 · {issueRows.length}행</summary>
-      {issueRows.slice(0,200).map(row => <p key={row.row}>{row.row}행 <HelpTip text={row.issues.map(p=>p.message).join(' / ')}/></p>)}
+    {!!issueRows.length && <details className="compact" open={kind==='members'}><summary>일괄 입력 검증 · {issueRows.length}행</summary>
+      {issueRows.slice(0,200).map(row => <p key={row.row}>{row.row}행 · {row.issues.map(p=>p.message).join(' / ')}</p>)}
     </details>}
     <div className="ledger-split"><div className="grid-shell ledger-grid"><AgGridReact<Row> theme={kind==='members' ? memberTheme : theme} onGridReady={event => {grid.current=event.api}}
       rowData={visibleRows} columnDefs={columns} quickFilterText={search} loading={query.isLoading || (problemOnly && checks.isLoading)}
       tooltipShowDelay={0} tooltipHideDelay={0}
       getRowId={p => String(p.data.id)} defaultColDef={{sortable:true,resizable:true,filter:false,suppressHeaderMenuButton:true,suppressHeaderFilterButton:true}} onRowClicked={e => {if (!busy) select(e.data)}}
-      rowClassRules={{'selected-ledger-row':p=>kind==='lines'&&!!draft.id&&p.data?.id===draft.id}}
+      rowClassRules={{'selected-ledger-row':p=>!!draft.id&&p.data?.id===draft.id}}
       onCellKeyDown={e => {if (!busy && (e.event as KeyboardEvent)?.key === 'Enter') select(e.data)}}
       overlayNoRowsTemplate="등록된 자료가 없습니다."/></div>
     {selected && <form ref={form} className="ledger-editor" onSubmit={e => {e.preventDefault(); void action(save)}}>
@@ -258,6 +263,14 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
           focus(items[nextIssue.current % items.length].field)
           nextIssue.current += 1
         }}>다음 오류로 이동</button></div>
+        {kind==='lines' && <ul>
+          {issues.filter(problem=>problem.severity!=='INFO').map(problem=>
+            <li key={`${problem.field}-${problem.code}`}>
+              <button type="button" onClick={()=>focus(problem.field)}>
+                {fields[problem.field]} · {problem.message}
+              </button>
+            </li>)}
+        </ul>}
       </div>}
       {kind==='lines' && <p className="muted">실적 연도 정책이 지정한 날짜를 입력하세요. 순중량 등 참고 항목은 선택입니다.</p>}
       {kind==='lines' && <button className="extra-toggle" type="button" aria-expanded={showIdentity} onClick={()=>setShowIdentity(!showIdentity)}>
@@ -364,6 +377,18 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
       </button>}
       </div><div className="toolbar editor-actions">
         <button type="submit" className="primary" disabled={busy}>저장</button>
+        {kind==='members' && selected.id && <button type="button" className="danger" disabled={busy} onClick={() => {
+          if (!window.confirm(`‘${selected.name}’ 회원사를 명부에서 삭제하시겠습니까?`)) return
+          void action(async () => {
+            await request(`${path}/${selected.id}?revision=${selected.revision}`, {method:'DELETE'})
+            ++validation.current
+            setSelected(undefined)
+            setDraft({})
+            setIssues([])
+            await reload()
+            setMessage('회원사 삭제 완료')
+          })
+        }}>회원사 삭제</button>}
         {kind==='lines' && draft.id && <button type="button" className="danger" disabled={busy} onClick={() => {
           const reason = window.prompt('원장 행을 제외합니다. 제외 사유를 입력하세요.')
           if (reason?.trim()) void action(async () => {

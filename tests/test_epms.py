@@ -164,6 +164,96 @@ def client_for(path):
     return client, app
 
 
+def test_member_import_recovers_previously_rejected_workbook(tmp_path):
+    client, app = client_for(tmp_path / "live.db")
+    client.post("/api/organizations", params={"name": "회원사 가져오기"}).raise_for_status()
+    base = "/api/org/1"
+    producer, exporter, invalid = [
+        {key: value for key, value in member.items() if key != "id"} for member in MEMBERS
+    ]
+    producer.update(kind="생산", email="개인우편")
+    exporter.update(kind="수출")
+    invalid.update(email="invalid")
+    source = books.workbook([("회원사명부", books.MEMBER, [producer, exporter, invalid])])
+    sheet, _, rows = books.read_rows(source, books.MEMBER)
+    with app.state.db.begin() as conn:
+        file_id = conn.execute(store.import_files.insert().values(
+            org=1, sha=books.digest(source), kind="members", name="명부.xlsx", data=source,
+        )).inserted_primary_key[0]
+        conn.execute(store.import_rows.insert(), [
+            dict(file=file_id, sheet=sheet, row=row_index, original=values) for row_index, values in rows
+        ])
+
+    def upload():
+        response = client.post(base + "/import/members", params={"name": "명부.xlsx"}, content=source)
+        response.raise_for_status()
+        return response.json()
+
+    first = upload()
+    assert (first["imported"], first["skipped"]) == (2, 0)
+    assert [(row["row"], row["issues"][0]["code"]) for row in first["rejected"]] == [(4, "M012")]
+    saved = client.get(base + "/data/members").json()
+    assert [row["kind"] for row in saved] == ["생산자", "수출업체"]
+    assert saved[0]["email"] == ""
+    retry = upload()
+    assert (retry["imported"], retry["skipped"], retry["rejected"]) == (0, 2, first["rejected"])
+    assert client.get(base + "/data/members").json() == saved
+    with app.state.db.connect() as conn:
+        originals = conn.execute(store.import_rows.select().order_by(store.import_rows.c.row)).all()
+    assert [row.original for row in originals] == [values for _, values in rows]
+
+
+def test_member_standard_template_keeps_validations_and_imports(tmp_path):
+    client, _ = client_for(tmp_path / "live.db")
+    client.post("/api/organizations", params={"name": "표준양식 검증"}).raise_for_status()
+    base = "/api/org/1"
+    response = client.get(base + "/export/members", params={"template": "true"})
+    response.raise_for_status()
+    book = load_workbook(BytesIO(response.content))
+    assert book.sheetnames == ["회원사명부", "작성·AI 변환 안내"]
+    sheet = book.worksheets[0]
+    assert [cell.value for cell in sheet[1]] == list(books.MEMBER.values())
+    validations = sheet.data_validations.dataValidation
+    assert len(validations) == len(books.MEMBER)
+    assert all(rule.showErrorMessage and rule.errorStyle == "stop" and len(rule.formula1) <= 255
+               for rule in validations)
+    kind = next(rule for rule in validations if "C2" in rule)
+    assert kind.type == "list" and kind.formula1 == '"생산자,수출업체,복수"' and "C50001" in kind
+    assert sheet.column_dimensions["B"].number_format == "@"
+    assert sheet.column_dimensions["E"].number_format == "yyyy-mm-dd"
+    assert book.worksheets[1]["A4"].value == "AI에 전달할 요청"
+    sheet.append([MEMBERS[0].get(key) for key in books.MEMBER])
+    completed = BytesIO()
+    book.save(completed)
+    result = client.post(base + "/import/members", params={"name": "작성.xlsx"}, content=completed.getvalue())
+    assert result.json()["imported"] == 1
+
+
+def test_line_import_saves_incomplete_rows_for_correction(tmp_path):
+    client, _ = client_for(tmp_path / "review.db")
+    client.post("/api/organizations", params={"name": "원장 보완"}).raise_for_status()
+    base = "/api/org/1"
+    for member in MEMBERS:
+        values = {key: value for key, value in member.items() if key != "id"}
+        assert client.post(base + "/data/members", json=[{"values": values}]).json()[0]["row"]
+    incomplete = line(line="", version="", scope="", status="")
+    incomplete.pop("id")
+    source = books.workbook([("원장", books.LINE, [incomplete])])
+    result = client.post(base + "/import/lines", params={"name": "원장.xlsx"}, content=source).json()
+    assert (result["imported"], result["needs_review"], result["rejected"]) == (1, 1, [])
+    saved, = client.get(base + "/data/lines").json()
+    assert {problem["code"] for problem in client.get(base + "/line-checks").json()[str(saved["id"])]} >= {
+        "D003", "D014", "D064", "D010",
+    }
+    calculated = rules.calculate([saved], MEMBERS, POLICY)
+    assert calculated["accepted_lines"] == 0 and not calculated["ready"]
+    update = client.post(base + "/data/lines", json=[{
+        "id": saved["id"], "revision": saved["revision"], "values": incomplete | {"scope": "대상"},
+    }]).json()[0]
+    assert update["row"]["scope"] == "대상"
+    assert any(problem["code"] == "D003" for problem in update["issues"])
+
+
 def test_workflow_and_restore(tmp_path):
     client, app = client_for(tmp_path / "live.db")
     assert client.get("/api/organizations", headers={"x-epms-token":"bad"}).status_code == 403
