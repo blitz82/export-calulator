@@ -8,6 +8,8 @@ Windows에서 실행하는 한국어 공동정산 업무 프로그램입니다. 
 
 개발 환경은 Python 3.12 이상과 Node.js 24를 사용했습니다.
 
+별도 런타임 설치가 어려운 PC에서는 [GitHub 릴리스](https://github.com/blitz82/export-calulator/releases/latest)의 Windows x64 무설치판(Portable)을 사용하세요. 두 배포본 모두 다운로드한 ZIP의 **속성 → 일반**에 **차단 해제**가 표시되면 적용한 뒤 압축을 푸세요.
+
 ```powershell
 python -m pip install -r requirements-dev.txt
 npm ci
