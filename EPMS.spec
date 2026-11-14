@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_data_files
-from PyInstaller.utils.hooks import collect_submodules
 from PyInstaller.utils.hooks import collect_all
+from PyInstaller.utils.hooks import collect_submodules, get_module_file_attribute
 
 datas = [('dist', 'dist'), ('epms/submission_2027.json', 'epms'), ('epms/migrations', 'epms/migrations'), ('build/template/2027-공식양식.xlsx', 'samples')]
 binaries = []
@@ -11,6 +11,7 @@ datas += [('epms/windows_ocr.ps1', 'epms')]
 tmp_ret = collect_all('pypdfium2_raw')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 hiddenimports += collect_submodules('uvicorn')
+get_module_file_attribute('webview')
 tmp_ret = collect_all('webview')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 

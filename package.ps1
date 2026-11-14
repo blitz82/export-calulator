@@ -1,4 +1,4 @@
-﻿param([string]$Python = "python", [string]$WebViewRuntime = "build/WebView2")
+param([string]$Python = "python", [string]$WebViewRuntime = "build/WebView2")
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 $appName = "공동정산 수출실적 관리"
@@ -9,6 +9,8 @@ $signature = Get-AuthenticodeSignature -LiteralPath $runtimeExe
 if ($signature.Status -ne "Valid" -or $signature.SignerCertificate.Subject -notmatch "O=Microsoft Corporation") {
     throw "Microsoft WebView2 실행 파일 서명을 확인할 수 없습니다."
 }
+& $Python -c "import webview; import clr; import webview.platforms.winforms"
+if ($LASTEXITCODE -ne 0) { throw "데스크톱 빌드 의존성을 불러올 수 없습니다. 지정한 Python 환경에 requirements-dev.txt를 설치하세요." }
 npm.cmd run build
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 & $Python -m epms.prepare_template
