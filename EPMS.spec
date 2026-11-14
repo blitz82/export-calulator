@@ -7,6 +7,9 @@ datas = [('dist', 'dist'), ('epms/submission_2027.json', 'epms'), ('epms/migrati
 binaries = []
 hiddenimports = []
 datas += collect_data_files('tzdata')
+datas += [('epms/windows_ocr.ps1', 'epms')]
+tmp_ret = collect_all('pypdfium2_raw')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 hiddenimports += collect_submodules('uvicorn')
 tmp_ret = collect_all('webview')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]

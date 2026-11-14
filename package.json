@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc && vite build",
-    "test": "vitest run --exclude tests/browser/**",
+    "test": "vitest run --exclude tests/browser/** --exclude build/**",
     "test:e2e": "playwright test"
   },
   "dependencies": {

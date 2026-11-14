@@ -3,5 +3,7 @@ uvicorn==0.54.0
 SQLAlchemy==2.1.8
 alembic==1.20.1
 openpyxl==3.1.5
+pypdfium2==5.13.0
+Pillow==13.0.0
 tzdata
 pywebview==6.2.1; sys_platform == "win32"

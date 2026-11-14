@@ -100,10 +100,13 @@ def validate_line(row, members, policy=None):
         issues.append(issue("D001", "number", "수출신고번호를 입력하세요."))
     elif not re.fullmatch(r"[0-9]{5}-?[0-9]{2}-?[0-9]{5}(?:[A-Za-z0-9]|[0-9][A-Za-z])", number):
         issues.append(issue("D002", "number", "수출신고번호의 자리수와 구분 기호를 확인하세요."))
-    for key, missing, invalid in (("line", "D003", "D004"), ("version", "D014", "D013")):
+    for key, missing, invalid, label in (("line", "D003", "D004", "품목란 번호"),
+                                         ("version", "D014", "D013", "정정 버전")):
         value = clean(row.get(key))
         if not re.fullmatch(r"[0-9]{1,8}", value) or not int(value):
-            issues.append(issue(invalid if value else missing, key, "원본에서 확인한 양의 정수를 입력하세요."))
+            message = (f"{label}는 1부터 99999999까지 숫자로 입력하세요." if value else
+                       f"{label}가 비어 있습니다. 원장에서 신고 정보를 확인하세요.")
+            issues.append(issue(invalid if value else missing, key, message))
     dates = {}
     for field, missing in (("declared", "D005"), ("shipped", "D006")):
         dates[field] = day(row.get(field))
@@ -237,12 +240,12 @@ def calculate(rows, members, policy):
         versions = {int(row["version"]) for row, *_ in candidates}
         if len(versions) > 1:
             # Revision numbers alone do not prove the replacement scope.
-            checks.extend(dict(issue("D083", "version", "정정 전후 품목란의 적용 범위를 확인하세요."),
+            checks.extend(dict(issue("D083", "version", "같은 신고번호와 품목란에 서로 다른 정정본이 있습니다. 원본을 대조해 유효한 신고를 확인하고, 대체된 행은 원장에서 제외하세요."),
                                row_id=row["id"]) for row, *_ in candidates)
             continue
         fingerprints = {line_fingerprint(row) for row, *_ in candidates}
         if len(fingerprints) > 1:
-            checks.extend(dict(issue("D012", "usd", "동일 신고 품목란의 입력값이 서로 다릅니다."),
+            checks.extend(dict(issue("D012", "usd", "같은 신고번호와 품목란에 입력 내용이 다른 행이 있습니다. 원본에서 품목란 번호와 입력값을 확인하세요."),
                                row_id=row["id"]) for row, *_ in candidates)
             continue
         row, issues, parties, _ = candidates[0]

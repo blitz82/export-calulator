@@ -210,3 +210,30 @@ aside :is(button,summary,a):focus-visible { outline-color:#e5f0e8; }
   .exit-button { width:auto; }
   header { padding-inline:16px; }
 }
+.ocr-dialog { margin: auto; width: min(1320px, 96vw); max-width: none; max-height: 94vh; overflow: auto; padding: 16px; border: 1px solid var(--control-border); border-radius: var(--panel-radius); background: white; }
+.ocr-dialog::backdrop { background: rgb(0 0 0 / 42%); }
+.ocr-dialog h2 { margin: 0; }
+.ocr-dialog header { height: auto; padding: 0 0 8px; }
+.ocr-dialog > p { margin: 8px 0; }
+.ocr-upload { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 12px; margin-top: 12px; padding: 20px; border: 2px dashed var(--control-border); border-radius: var(--panel-radius); background: #f6f8f6; }
+.ocr-upload-active { border-color: var(--primary); background: #e4f2e9; }
+.ocr-panels { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+.ocr-panels section { min-width: 0; }
+.ocr-page { height: min(65vh, 760px); overflow: auto; border: 1px solid #ccc; background: #eee; }
+.ocr-page img { display: block; max-width: none; }
+.stored-pdf-dialog { width: min(900px, 96vw); }
+.stored-pdf-dialog .ocr-page img { width: 100%; }
+.ocr-page p { padding: 12px; }
+.ocr-panels pre { max-height: 14rem; overflow: auto; white-space: pre-wrap; }
+.ocr-panels fieldset { max-height: min(55vh, 625px); overflow: auto; margin: 8px 0; }
+.ocr-panels footer { color: inherit; padding: 0; }
+.ocr-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 14px; }
+.ocr-fields label, .ocr-fields small { display: block; }
+.ocr-fields input:not([type=checkbox]), .ocr-fields select { width: 100%; }
+.ocr-fields .ocr-confirm { display: flex; align-items: center; gap: 4px; margin-top: 4px; }
+.ocr-fields small, .ocr-dialog [role=alert] { color: #a21722; }
+.ocr-fields [aria-invalid=true] { border-color: #a21722; }
+@media (max-width: 800px) {
+  .ocr-panels { grid-template-columns: minmax(0, 1fr); }
+  .ocr-page { height: 45vh; }
+}

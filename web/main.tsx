@@ -5,6 +5,7 @@ import { HashRouter, Navigate, NavLink, Route, Routes, useLocation, useSearchPar
 import { download, get, send } from './api'
 import type { Fields, Problem, Row } from './grid'
 import { HelpTip } from './help-tip'
+import { PdfView } from './pdf-view'
 import './style.css'
 
 const LedgerGrid = lazy(() => import('./grid').then(module => ({default:module.LedgerGrid})))
@@ -57,7 +58,10 @@ function useAction() {
   return {run,busy,status:busy?'처리 중…':status}
 }
 
-function Table({rows,fields,onPick,searchLabel='표 검색'}: {rows: Row[]; fields: Fields; onPick?: (row:Row) => void; searchLabel?:string}) {
+function Table({rows,fields,onPick,editLink,pdfOrg,searchLabel='표 검색'}: {
+  rows: Row[]; fields: Fields; onPick?: (row:Row) => void; editLink?: (row:Row) => string | undefined;
+  pdfOrg?:number; searchLabel?:string
+}) {
   const [search,setSearch] = useState('')
   const [sort,setSort] = useState<{key:string;reverse:boolean}>()
   const [page,setPage] = useState(0)
@@ -66,14 +70,17 @@ function Table({rows,fields,onPick,searchLabel='표 검색'}: {rows: Row[]; fiel
     Number(a[sort.key]??0)-Number(b[sort.key]??0) : String(a[sort.key]??'').localeCompare(String(b[sort.key]??''),'ko',{numeric:true})))
   const last = Math.max(0, Math.ceil(items.length/100)-1)
   const active = Math.min(page,last)
+  const showPdf = pdfOrg !== undefined && rows.some(row=>row.pdf)
   return <section className="panel">
     <div className="toolbar"><label>{searchLabel}<input type="search" value={search}
       onChange={e => {setSearch(e.target.value); setPage(0)}}/></label><span className="muted">{items.length.toLocaleString('ko-KR')}건</span></div>
     <div className="table-scroll"><table><thead><tr>{Object.entries(fields).map(([key,label]) => <th key={key} className={numericKey(key)?'numeric':undefined}>
       <button onClick={() => setSort({key,reverse:sort?.key===key && !sort.reverse})}>{label}{sort?.key===key ? sort.reverse?' (내림차순)':' (오름차순)':''}</button></th>)}
-      {onPick && <th>상세</th>}</tr></thead><tbody>{items.slice(active*100,active*100+100).map((row,i) => <tr key={i}>
+      {onPick && <th>상세</th>}{editLink && <th>원장 수정</th>}{showPdf && <th>원본 PDF</th>}</tr></thead><tbody>{items.slice(active*100,active*100+100).map((row,i) => <tr key={i}>
       {Object.keys(fields).map(key => <td key={key} className={numericKey(key)?'numeric':undefined}>{numericKey(key)?formatNumber(row[key]):String(row[key]??'')}</td>)}
-      {onPick && <td><button onClick={() => onPick(row)}>보기</button></td>}</tr>)}</tbody></table></div>
+      {onPick && <td><button onClick={() => onPick(row)}>보기</button></td>}
+      {editLink && <td>{editLink(row) && <NavLink to={editLink(row)!}>신고 행 열기</NavLink>}</td>}
+      {showPdf && <td>{row.pdf && <PdfView key={row.pdf.file+':'+row.pdf.page} org={pdfOrg} pdf={row.pdf}/>}</td>}</tr>)}</tbody></table></div>
     {!items.length && <p className="muted">조회된 자료가 없습니다.</p>}
     {last > 0 && <div className="toolbar"><button disabled={!active} onClick={() => setPage(active-1)}>이전</button>
       <span>{active+1} / {last+1}</span><button disabled={active===last} onClick={() => setPage(active+1)}>다음</button></div>}
@@ -297,12 +304,13 @@ function RunWorkspace({org,mode,fields}: {org:Org;mode:string;fields?:Record<'me
         ...data.member_issues.map(row=>({...row,field:fields?.members[row.field]??'기타 항목',severity:severityLabels[row.severity]??'기타 상태'})),
       ]}
         fields={{row_id:'원장 번호',field:'항목',severity:'심각도',message:'검증 내용'}}
+        editLink={r=>r.row_id && r.severity!=='알림' ? `/lines?row=${r.row_id}` : undefined}
         onPick={r=>setRowId(r.row_id ? Number(r.row_id) : undefined)}/> : <>
         <Table rows={data.summary} fields={summaryFields} onPick={r=>{setNumber(String(r.number));setRowId(undefined)}}/>
         <details className="compact" open={!!number || mode==='audit'} key={number||'all'}><summary>신고 품목란별 인정 내역</summary>
         <div className="section-top"><h2 className="recognition-heading">{number ? String(data.summary.find(row=>row.number===number)?.name ?? number) : '전체 회원사'}</h2>
           {number && <button onClick={()=>{setNumber('');setRowId(undefined)}}>뒤로</button>}</div>
-        <Table rows={data.ledger.filter(r=>!number||r.number===number)} fields={ledgerFields} onPick={r=>setRowId(Number(r.row_id))}/>
+        <Table rows={data.ledger.filter(r=>!number||r.number===number)} fields={ledgerFields} pdfOrg={org.id} onPick={r=>setRowId(Number(r.row_id))}/>
         </details>
       </>}
     </>}
@@ -323,8 +331,8 @@ function Help() {
   return <section className="panel guide"><h2>공동정산 업무 순서</h2><ol>
     <li><NavLink to="/settings">프로그램 설정</NavLink>에서 품목을 등록하고 연도별 회원 기준일, 귀속일, 대상 HS코드를 저장합니다.</li>
     <li><NavLink to="/members">회원사 등록·수정</NavLink>에서 명부를 등록합니다. 역할 사업자는 사업자번호와 등록 이름 또는 별칭으로 대조합니다.</li>
-    <li><NavLink to="/lines">수출신고필증 입력·수정</NavLink>에서 실제 품목란, 정정 버전, 금액, 물량 및 역할을 입력합니다. 원본에 역할 정보가 없으면 확인 상태를 명시합니다.</li>
-    <li>실적 계산을 실행하고 검증 목록을 확인합니다. 정정 버전 충돌은 원본과 적용 범위를 확인한 뒤 정리합니다.</li>
+    <li><NavLink to="/lines">수출신고필증 입력·수정</NavLink>에서 금액, 물량 및 역할을 입력합니다. 한 신고에 품목란이 여러 개이거나 정정 신고라면 입력 화면에서 해당 항목을 펼쳐 원본 값을 확인하세요.</li>
+    <li>실적 계산에서 보완이 필요한 행은 <b>신고 행 열기</b>로 바로 수정할 수 있습니다. 수정한 뒤 저장하고 실적을 다시 계산하세요.</li>
     <li>회원사별 실적을 확인한 뒤 <NavLink to="/submission">제출자료 준비</NavLink>에서 실적 연도를 선택하고 두 연도를 계산합니다. 검증을 통과하면 제출용 Excel을 내려받습니다.</li>
   </ol><h2>인정 기준</h2><p>대행자와 화주는 직접수출 자격, 제조자는 간접수출 자격을 가집니다. 같은 사업자가 두 자격을 갖는 경우 직접수출을 한 번 인정합니다.</p>
   <p>동일 신고 품목란의 실제 수출액은 한 번 집계합니다. 서로 다른 회원사에는 해당 역할에 따른 실적이 각각 귀속됩니다.</p></section>

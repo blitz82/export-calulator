@@ -12,11 +12,11 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from openpyxl.utils.exceptions import InvalidFileException
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.exc import IntegrityError
 
-from epms import books, rules, store, submission
+from epms import books, ocr, rules, store, submission
 
 ROOT = Path(__file__).resolve().parents[1]
 FIELDS = {"members": books.MEMBER, "lines": books.LINE}
@@ -46,6 +46,13 @@ class Policy(BaseModel):
 
 class ResetLedger(BaseModel):
     confirmation: str
+
+
+class OcrRow(BaseModel):
+    page: int = Field(ge=1, le=ocr.MAX_PAGES)
+    values: dict[str, str] = Field(max_length=50)
+    verified_usd: str = Field(max_length=100)
+    verified_kg: str = Field(max_length=100)
 
 
 def fail(message, status=400):
@@ -177,7 +184,11 @@ def create_app(path=None):
         table = table_for(kind)
         with db.connect() as conn:
             organization(conn, org)
-            return store.records(conn, table, org)
+            rows = store.records(conn, table, org)
+            if kind == "lines":
+                pdfs = line_pdfs(conn, org)
+                return [dict(row, pdf=pdfs.get(row["id"])) for row in rows]
+            return rows
 
     @app.post("/api/org/{org}/data/{kind}/validate")
     def preview(org: int, kind: str, edit: Edit):
@@ -326,6 +337,157 @@ def create_app(path=None):
             store.log(conn, org, user, "Excel", file_id, "원본 저장", None, dict(name=name, sha=sha, rows=len(rows)))
         return dict(imported=len(rows) - len(rejected), rejected=rejected, profile=profile)
 
+    ocr_path = "/api/org/{org}/ocr"
+
+    def line_pdfs(conn, org):
+        lines, sources, files = store.declarations, store.import_rows, store.import_files
+        query = (select(lines.c.id, files.c.id.label("file"), files.c.name, sources.c.row.label("page"))
+                 .select_from(lines.join(sources, lines.c.source == sources.c.id)
+                              .join(files, files.c.id == sources.c.file))
+                 .where(lines.c.org == org, files.c.org == org, files.c.kind == "pdf"))
+        return {row["id"]: dict(file=row["file"], name=row["name"], page=row["page"])
+                for row in conn.execute(query).mappings()}
+
+    def ocr_file(conn, org, file_id):
+        files = store.import_files
+        record = conn.execute(files.select().where(files.c.id == file_id, files.c.org == org,
+                                                   files.c.kind == "pdf")).mappings().first()
+        if record is None:
+            fail("PDF 접수 자료를 찾을 수 없습니다.", 404)
+        return record
+
+    def ocr_pages(conn, file_id):
+        sources = store.import_rows
+        return list(conn.execute(sources.select().where(sources.c.file == file_id)
+                                 .order_by(sources.c.row)).mappings())
+
+    def ocr_approved(conn, file_id):
+        lines, sources = store.declarations, store.import_rows
+        return conn.execute(select(lines.c.id).join(sources, lines.c.source == sources.c.id)
+                            .where(sources.c.file == file_id).limit(1)).first() is not None
+
+    def extract_ocr(org, name, data, user):
+        sha = books.digest(data)
+        files = store.import_files
+        query = select(files.c.id).where(files.c.org == org, files.c.sha == sha, files.c.kind == "pdf")
+        with db.connect() as conn:
+            organization(conn, org)
+            file_id = conn.execute(query).scalar()
+            if file_id is not None:
+                return dict(id=file_id, pages=[row["original"] for row in ocr_pages(conn, file_id)],
+                            approved=ocr_approved(conn, file_id))
+        try:
+            pages = ocr.extract(data)
+        except ImportError:
+            fail("PDF 처리 구성 요소를 설치한 뒤 다시 시도하세요.", 503)
+        except ValueError as error:
+            fail(str(error))
+        with db.begin() as conn:
+            conn.exec_driver_sql("BEGIN IMMEDIATE")
+            file_id = conn.execute(query).scalar()
+            if file_id is None:
+                file_id = conn.execute(files.insert().values(org=org, sha=sha, kind="pdf", name=name,
+                                                            data=data)).inserted_primary_key[0]
+                conn.execute(store.import_rows.insert(), [
+                    dict(file=file_id, sheet="PDF", row=page["page"], original=page) for page in pages
+                ])
+                store.log(conn, org, user, "PDF", file_id, "OCR 원본 접수", None,
+                          dict(name=name, sha=sha, pages=len(pages)))
+            return dict(id=file_id, pages=[row["original"] for row in ocr_pages(conn, file_id)],
+                        approved=ocr_approved(conn, file_id))
+
+    @app.post(ocr_path)
+    async def upload_ocr(org: int, name: str, request: Request):
+        from starlette.concurrency import run_in_threadpool
+
+        if not name.lower().endswith(".pdf") or len(name) > 240 or any(ch in name for ch in "/\\:"):
+            fail("PDF 파일명을 확인하세요.")
+        payload = bytearray()
+        async for chunk in request.stream():
+            if len(payload) + len(chunk) > ocr.MAX_BYTES:
+                fail("PDF 파일 크기는 20MB 이하여야 합니다.", 413)
+            payload.extend(chunk)
+        return await run_in_threadpool(extract_ocr, org, name, bytes(payload), actor(request))
+
+    @app.get(ocr_path + "/{file_id}/page/{page}")
+    def preview_ocr_page(org: int, file_id: int, page: int):
+        with db.connect() as conn:
+            data = ocr_file(conn, org, file_id)["data"]
+        try:
+            return Response(ocr.page_image(data, page), media_type="image/png")
+        except ValueError as error:
+            fail(str(error))
+
+    @app.get(ocr_path + "/{file_id}/original")
+    def original_pdf(org: int, file_id: int):
+        with db.connect() as conn:
+            file = ocr_file(conn, org, file_id)
+            if not ocr_approved(conn, file_id):
+                fail("원장에 등록된 PDF를 찾을 수 없습니다.", 404)
+        return Response(file["data"], media_type="application/pdf", headers={
+            "Content-Disposition": "attachment; filename*=UTF-8''" + quote(file["name"]),
+            "Cache-Control": "no-store",
+        })
+
+    @app.get(ocr_path + "/{file_id}/pages")
+    def stored_pdf_pages(org: int, file_id: int):
+        with db.connect() as conn:
+            sources, files = store.import_rows, store.import_files
+            pages = conn.execute(select(func.count()).select_from(sources.join(files))
+                                 .where(files.c.id == file_id, files.c.org == org,
+                                        files.c.kind == "pdf")).scalar_one()
+            if not pages:
+                fail("PDF 접수 자료를 찾을 수 없습니다.", 404)
+            return pages
+
+    @app.post(ocr_path + "/{file_id}/approve")
+    def approve_ocr(org: int, file_id: int, reviewed: list[OcrRow], request: Request):
+        if not 1 <= len(reviewed) <= 300:
+            fail("한 PDF에서 1~300개 품목란을 승인할 수 있습니다.")
+        with db.begin() as conn:
+            conn.exec_driver_sql("BEGIN IMMEDIATE")
+            file = ocr_file(conn, org, file_id)
+            if ocr_approved(conn, file_id):
+                fail("이 PDF는 이미 원장에 등록되었습니다.", 409)
+            pages = {row["row"]: row["id"] for row in ocr_pages(conn, file_id)}
+            index = member_index(conn, org)
+            existing = set()
+            for row in store.records(conn, store.declarations, org):
+                try:
+                    existing.add(rules.declaration_key(row))
+                except (KeyError, ValueError, TypeError):
+                    continue
+            errors = []
+            validated = []
+            for position, row in enumerate(reviewed, 1):
+                if row.page not in pages:
+                    fail("PDF 원본 쪽을 확인하세요.")
+                values = {key: rules.clean(value) for key, value in row.values.items() if key in FIELDS["lines"]}
+                if any(len(value) > 4000 for value in values.values()):
+                    fail("셀 입력값은 4,000자 이하여야 합니다.")
+                problems = rules.validate_line(values, index)[0]
+                for key, confirmed in (("usd", row.verified_usd), ("kg", row.verified_kg)):
+                    value = values.get(key, "")
+                    if not value or rules.decimal(value) is None or value != rules.clean(confirmed):
+                        problems.append(rules.issue("P040", key, "원본 PDF와 수치를 대조하고 확인하세요."))
+                if values.get("fob") and rules.decimal(values["fob"]) != rules.decimal(values.get("usd")):
+                    problems.append(rules.issue("P025", "fob", "FOB(USD)와 신고금액(USD)을 대조하세요."))
+                if not any(problem["severity"] == "ERROR" for problem in problems):
+                    key = rules.declaration_key(values)
+                    if key in existing:
+                        problems.append(rules.issue("P011", "line", "동일 신고번호·품목란이 있습니다. 기존 원장에서 중복 또는 정정 여부를 확인하세요."))
+                    existing.add(key)
+                errors.extend(dict(problem, position=position) for problem in problems if problem["severity"] == "ERROR")
+                validated.append((row.page, values))
+            if errors:
+                return JSONResponse({"issues": errors}, status_code=422)
+            user = actor(request)
+            for page, values in validated:
+                save(conn, org, "lines", Edit(values=values, reason="OCR 원본 대조 후 승인"), user, pages[page], index)
+            store.log(conn, org, user, "PDF", file_id, "OCR 승인", None,
+                      dict(sha=file["sha"], rows=len(validated), verified=["usd", "kg"]))
+        return {"imported": len(validated)}
+
     @app.get("/api/org/{org}/export/{kind}")
     def export_data(org: int, kind: str, template: bool = False):
         table = table_for(kind)
@@ -402,7 +564,10 @@ def create_app(path=None):
         with db.connect() as conn:
             run = get_run(conn, org, run_id)
             fields = ("rule", "policy", "checks", "member_issues", "actual_usd", "actual_kg", "accepted_lines", "ledger", "ready")
-            return dict({k: run[k] for k in fields}, summary=rules.summarize(run["ledger"]),
+            pdfs = line_pdfs(conn, org)
+            ledger = [dict(row, pdf=next((pdfs[i] for i in row.get("source_ids", [row["row_id"]]) if i in pdfs), None))
+                      for row in run["ledger"]]
+            return dict({k: run[k] for k in fields} | {"ledger": ledger}, summary=rules.summarize(run["ledger"]),
                         attributed_usd=str(sum((rules.Decimal(row["usd"]) for row in run["ledger"]), rules.Decimal(0))))
 
     @app.get("/api/org/{org}/audit")

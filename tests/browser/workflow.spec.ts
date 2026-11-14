@@ -27,7 +27,11 @@ test('새 품목에서 회원사와 신고를 입력하고 제출용 Excel 확�
 
   await nav.getByRole('link',{name:'업무 홈'}).click()
   await page.getByRole('link',{name:'신고필증 입력하기'}).click()
+  await page.getByText('열 표시',{exact:true}).click()
+  await expect(page.getByRole('checkbox',{name:/실제 품목란|정정 버전/})).toHaveCount(0)
+  await expect(page.getByRole('columnheader',{name:/품목란|정정 버전/})).toHaveCount(0)
   await page.getByRole('button',{name:'신고필증 추가'}).click()
+  await expect(page.locator('input[name="line"], input[name="version"]')).toHaveCount(0)
   for (const [field,value] of Object.entries({
     number:'12345-26-654321',shipped:'2026-01-02',usd:'2500',hs:'0806100000',
     agent:'1234567834',agent_name:'포도 협동조합',
@@ -52,6 +56,26 @@ test('새 품목에서 회원사와 신고를 입력하고 제출용 Excel 확�
   }
   await nav.getByRole('link',{name:'수출실적 계산'}).click()
   await page.getByRole('spinbutton',{name:'실적 연도'}).fill('2026')
+  const {token}=await (await page.request.get('/api/session')).json()
+  const headers={'x-epms-token':token}
+  const org=await office(page.request,headers)
+  const path=`/api/org/${org.id}/data/lines`
+  const [saved]=await (await page.request.get(path,{headers})).json()
+  const {id,revision,source,pdf,...values}=saved
+  const edited=await page.request.post(path,{headers,data:[{id,revision,values:{...values,line:'',version:''}}]})
+  expect(edited.ok()).toBeTruthy()
+  await page.getByRole('button',{name:'수출실적 계산'}).click()
+  await expect(page.getByText('계산 보완 필요',{exact:true})).toBeVisible()
+  await page.getByRole('row').filter({hasText:'품목란 번호가 비어 있습니다'}).getByRole('link',{name:'신고 행 열기'}).click()
+  const details=page.getByRole('group',{name:'품목란 번호와 정정 버전'})
+  await expect(details).toBeVisible()
+  await details.getByRole('button',{name:'비어 있는 항목에 1 넣기'}).click()
+  await expect(details.locator('input[name="line"]')).toHaveValue('1')
+  await expect(details.locator('input[name="version"]')).toHaveValue('1')
+  await page.getByRole('button',{name:'저장',exact:true}).click()
+  await expect(page.getByRole('status')).toContainText('저장됨')
+  await nav.getByRole('link',{name:'수출실적 계산'}).click()
+  await page.getByRole('spinbutton',{name:'실적 연도'}).fill('2026')
   await page.getByRole('button',{name:'수출실적 계산'}).click()
   await expect(page.getByText('계산 검증 통과',{exact:true})).toBeVisible()
   await nav.getByRole('link',{name:'회원사별 실적 확인'}).click()
@@ -67,9 +91,6 @@ test('새 품목에서 회원사와 신고를 입력하고 제출용 Excel 확�
   await page.getByRole('button',{name:'최종 확정 후 제출용 Excel 다운로드'}).click()
   expect((await result).suggestedFilename()).toMatch(/2026년_최종확정본\.xlsx/)
 
-  const {token}=await (await page.request.get('/api/session')).json()
-  const headers={'x-epms-token':token}
-  const org=await office(page.request,headers)
   const [run]=await (await page.request.get(`/api/org/${org.id}/runs`,{headers})).json()
   for (const [route,label] of [['audit','감사 자료'],['checks','상세 검증 이력']]) {
     await page.goto('/#/'+route+'?run='+run.id)
@@ -135,6 +156,7 @@ test('대시보드에서 보완 원장을 열고 오류 항목 수정', async ({
   await expect(amount).toHaveAccessibleDescription('원본의 숫자와 단위를 확인하세요.')
   await amount.fill('2500')
   await expect(amount).toHaveAttribute('aria-invalid','false')
+  await editor.getByRole('button',{name:'비어 있는 항목에 1 넣기'}).click()
   await editor.getByRole('button',{name:'저장',exact:true}).click()
   await expect(page.getByRole('status')).toContainText('저장됨')
   await expect(editor.locator('input[name="kg"]')).toHaveCount(0)

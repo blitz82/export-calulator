@@ -3,11 +3,11 @@ const token = fetch('/api/session').then(async response => {
   return (await response.json()).token as string
 })
 
-export async function request(path: string, init?: RequestInit) {
+export async function request(path: string, init?: RequestInit, handledStatuses: number[] = []) {
   const headers = new Headers(init?.headers)
   headers.set('x-epms-token', await token)
   const response = await fetch('/api/' + path, {...init, headers})
-  if (!response.ok) {
+  if (!response.ok && !handledStatuses.includes(response.status)) {
     const error = await response.json().catch(() => ({}))
     throw new Error(typeof error.detail === 'string' ? error.detail : '요청을 완료하지 못했습니다.')
   }
