@@ -11,11 +11,11 @@ import './style.css'
 const LedgerGrid = lazy(() => import('./grid').then(module => ({default:module.LedgerGrid})))
 const menus = [
   ['/', '업무 홈', '품목의 등록 현황과 지금 할 일을 확인합니다.'],
-  ['/members', '회원사 등록·수정', '회원사를 추가하거나 Excel 명부를 가져옵니다.'],
-  ['/lines', '수출신고필증 입력·수정', '수출신고필증의 품목란을 입력하고 보완합니다.'],
+  ['/members', '회원사 명부', '회원사를 추가하거나 Excel 명부를 가져옵니다.'],
+  ['/lines', '신고 원장', '수출신고필증의 품목란을 입력하고 보완합니다.'],
   ['/calculate', '수출실적 계산', '연도별 정책을 적용해 직접·간접 수출실적을 계산합니다.'],
   ['/results', '회원사별 실적 확인', '회원사별 인정 금액과 신고 품목란별 근거를 확인합니다.'],
-  ['/submission', '제출자료 준비', '선택 연도와 직전 연도의 제출용 Excel을 준비합니다.'],
+  ['/submission', '제출자료', '선택 연도와 직전 연도의 제출용 Excel을 준비합니다.'],
   ['/audit', '감사 자료', '계산 근거, 원장 변경 이력 및 감사 증빙을 조회합니다.'],
   ['/checks', '상세 검증 이력', '이전 계산의 입력 및 계산 문제를 확인합니다.'],
   ['/settings', '프로그램 설정', '품목과 연도별 계산 정책을 등록하고 데이터 백업을 내려받습니다.'],
@@ -25,7 +25,6 @@ type Org = {id:number; name:string}
 type Run = {id:number; year:number; time:string}
 type Detail = {accepted_lines:number; actual_usd:string; attributed_usd:string; actual_kg:string|null; ready:boolean; rule:string;
   summary:Row[]; ledger:Row[]; checks:Problem[]; member_issues:Problem[]}
-type Readiness = {year:number; cutoff:string; previous_cutoff:string; saved:boolean; blocker:string|null}
 const numericKey = (key:string) => /(?:^|_)(usd|kg)$/.test(key) || key==='lines'
 const formatNumber = (value:unknown) => String(value??'').replace(/^-?\d+/, n=>n.replace(/\B(?=(\d{3})+(?!\d))/g,','))
 const summaryFields = {name:'회원사명',number:'사업자번호',direct_usd:'직접 USD',indirect_usd:'간접 USD',
@@ -58,9 +57,9 @@ function useAction() {
   return {run,busy,status:busy?'처리 중…':status}
 }
 
-function Table({rows,fields,onPick,editLink,pdfOrg,searchLabel='표 검색'}: {
+function Table({rows,fields,onPick,editLink,pdfOrg,searchLabel='표 검색', editLabel='신고 행 열기'}: {
   rows: Row[]; fields: Fields; onPick?: (row:Row) => void; editLink?: (row:Row) => string | undefined;
-  pdfOrg?:number; searchLabel?:string
+  pdfOrg?:number; searchLabel?:string; editLabel?:string
 }) {
   const [search,setSearch] = useState('')
   const [sort,setSort] = useState<{key:string;reverse:boolean}>()
@@ -76,10 +75,10 @@ function Table({rows,fields,onPick,editLink,pdfOrg,searchLabel='표 검색'}: {
       onChange={e => {setSearch(e.target.value); setPage(0)}}/></label><span className="muted">{items.length.toLocaleString('ko-KR')}건</span></div>
     <div className="table-scroll"><table><thead><tr>{Object.entries(fields).map(([key,label]) => <th key={key} className={numericKey(key)?'numeric':undefined}>
       <button onClick={() => setSort({key,reverse:sort?.key===key && !sort.reverse})}>{label}{sort?.key===key ? sort.reverse?' (내림차순)':' (오름차순)':''}</button></th>)}
-      {onPick && <th>상세</th>}{editLink && <th>원장 수정</th>}{showPdf && <th>원본 PDF</th>}</tr></thead><tbody>{items.slice(active*100,active*100+100).map((row,i) => <tr key={i}>
+      {onPick && <th>상세</th>}{editLink && <th>수정</th>}{showPdf && <th>원본 PDF</th>}</tr></thead><tbody>{items.slice(active*100,active*100+100).map((row,i) => <tr key={i}>
       {Object.keys(fields).map(key => <td key={key} className={numericKey(key)?'numeric':undefined}>{numericKey(key)?formatNumber(row[key]):String(row[key]??'')}</td>)}
       {onPick && <td><button onClick={() => onPick(row)}>보기</button></td>}
-      {editLink && <td>{editLink(row) && <NavLink to={editLink(row)!}>신고 행 열기</NavLink>}</td>}
+      {editLink && <td>{editLink(row) && <NavLink to={editLink(row)!}>{editLabel}</NavLink>}</td>}
       {showPdf && <td>{row.pdf && <PdfView key={row.pdf.file+':'+row.pdf.page} org={pdfOrg} pdf={row.pdf}/>}</td>}</tr>)}</tbody></table></div>
     {!items.length && <p className="muted">조회된 자료가 없습니다.</p>}
     {last > 0 && <div className="toolbar"><button disabled={!active} onClick={() => setPage(active-1)}>이전</button>
@@ -91,34 +90,22 @@ function Dashboard({org}: {org:Org}) {
   const prefix = `org/${org.id}`
   const members = useQuery({queryKey:[prefix+'/data/members'],queryFn:()=>get<Row[]>(prefix+'/data/members')})
   const lines = useQuery({queryKey:[prefix+'/data/lines'],queryFn:()=>get<Row[]>(prefix+'/data/lines')})
-  const runs = useQuery({queryKey:[prefix+'/runs'],queryFn:()=>get<Run[]>(prefix+'/runs')})
   const checksPath=prefix+'/line-checks'
   const checks=useQuery({queryKey:[checksPath],queryFn:()=>get<Record<string,Problem[]>>(checksPath)})
   const count=checks.data && Object.values(checks.data).filter(issues=>issues.some(p=>p.severity!=='INFO')).length
-  const latest=runs.data?.[0]
-  const detail=useQuery({queryKey:[prefix,'run',String(latest?.id??'')],
-    queryFn:()=>get<Detail>(`${prefix}/runs/${latest?.id}`),enabled:!!latest})
-  const policies=useQuery({queryKey:[prefix+'/policies'],queryFn:()=>get<Row[]>(prefix+'/policies')})
-  const next = !members.data || !lines.data || !runs.data || count===undefined || !policies.data || (latest&&!detail.data)
-    ? undefined
+  const next = !members.data || !lines.data || count===undefined ? undefined
     : !members.data.length ? ['/members','회원사 명부를 등록하세요.','회원사 등록하기']
     : !lines.data.length ? ['/lines','수출신고필증을 입력하세요.','신고필증 입력하기']
-    : count > 0 ? ['/lines?filter=issues','보완이 필요한 신고필증을 확인하세요.','보완 원장 열기']
-    : !policies.data.length ? ['/settings#calculation-policy','수출실적을 계산할 연도의 정책을 등록하세요.','계산 정책 열기']
-    : !latest ? ['/calculate','등록한 자료로 수출실적을 계산하세요.','수출실적 계산하기']
-    : !detail.data?.ready ? [`/calculate?run=${latest.id}`,'최근 계산에서 보완할 항목을 확인하세요.','계산 검증 열기']
-    : ['/results','회원사별 실적을 확인한 뒤 제출자료를 준비하세요.','회원사별 실적 확인']
+    : ['/submission','실적 연도를 선택하고 제출자료를 검토하세요.','제출자료 열기']
   return <>
     <section className="panel next-action"><h2>지금 할 일</h2>
       {next ? <><p>{next[1]}</p><NavLink className="button primary" to={next[0]}>{next[2]}</NavLink></>
-        : <p role="status">{[members,lines,runs,checks,policies,detail].some(query=>query.isError)
+        : <p role="status">{[members,lines,checks].some(query=>query.isError)
           ? '업무 현황을 불러오지 못했습니다.' : '업무 현황을 불러오는 중…'}</p>}
     </section>
     <div className="metrics">
       <NavLink className="metric metric-link" to="/lines?filter=issues"><span>보완 필요 원장 행</span>
         <strong>{count?.toLocaleString('ko-KR')??'—'}</strong> <small>행 · 원장 열기</small></NavLink>
-      <NavLink className="metric metric-link" to={latest?`/calculate?run=${latest.id}`:'/calculate'}><span>최근 계산</span>
-        <strong>{latest?`${latest.year}년`:'—'}</strong><small className="metric-detail">{latest?(detail.data?.ready?'검증 통과':detail.data?'보완 필요':'검증 상태 확인'):'계산 기록 없음'}</small></NavLink>
       <NavLink className="metric metric-link" to="/submission"><span>수출기업육성부 제출자료</span>
         <strong>제출 준비</strong><small className="metric-detail">연도별 준비 상태 확인</small></NavLink>
     </div>
@@ -141,9 +128,13 @@ function Settings({org,choices,refresh}: {org?:Org;choices:Org[];refresh: (item:
   const [basis,setBasis] = useState('')
   const [hs,setHs] = useState('')
   const [reason,setReason] = useState('사업지침')
+  const [resetText,setResetText] = useState('')
+  const [backedUp,setBackedUp] = useState(false)
   const action=useAction()
+  const client=useQueryClient()
   const prefix = `org/${org?.id}`
-  const policies = useQuery({queryKey:[prefix+'/policies'],queryFn:()=>get<Row[]>(prefix+'/policies'),enabled:!!org})
+  const policies = useQuery({queryKey:[prefix+'/policies'],queryFn:()=>get<{year:number; cutoff:string; basis:string; hs:string[]}[]>(prefix+'/policies'),enabled:!!org})
+  const priorPolicy=policies.data?.find(policy=>policy.year===Number(year)-1)
   return <>
     {choices.length>0 ? <form className="panel" onSubmit={e=>{e.preventDefault();void action.run(async()=>{
       refresh(await send<Org>('office/'+choice,undefined,'PUT'))
@@ -163,6 +154,12 @@ function Settings({org,choices,refresh}: {org?:Org;choices:Org[];refresh: (item:
       await send(prefix+'/policies/'+year,{cutoff,basis,hs:hs.split(/[,，\s]+/).filter(Boolean),reason},'PUT')
       await policies.refetch(); return '계산 정책을 저장했습니다.'
     })}}><h2>연도별 계산 정책</h2>
+      {priorPolicy && <button type="button" onClick={()=>{
+        setCutoff('')
+        setBasis(priorPolicy.basis)
+        setHs(priorPolicy.hs.join('\n'))
+        setReason('')
+      }}>전년도 귀속 기준·HS코드 불러오기</button>}
       <div className="entry">
         <label><span>실적 연도 <HelpTip text="수출실적을 조회하거나 계산할 연도입니다."/></span><input required type="number" min="1900" max="2100" value={year} onChange={e=>setYear(e.target.value)}/></label>
         <label><span>회원자격 기준일 <HelpTip text="가입과 탈퇴 날짜를 이 날짜와 비교해 회원 자격을 판단합니다."/></span><input required type="date" value={cutoff} onChange={e=>setCutoff(e.target.value)}/></label>
@@ -177,15 +174,126 @@ function Settings({org,choices,refresh}: {org?:Org;choices:Org[];refresh: (item:
       basis:row.basis==='shipped'?'선적일':row.basis==='declared'?'신고일':row.basis,
       hs:Array.isArray(row.hs)?row.hs.join(', '):row.hs}))} fields={{year:'연도',cutoff:'기준일',basis:'귀속 기준',hs:'대상 HS코드'}}/>}
     <section className="panel"><h2>데이터 백업</h2><button disabled={action.busy} onClick={() => action.run(async () => {
-      await download('backup'); return '백업 다운로드 완료'
+      await download('backup'); setBackedUp(true); return '백업 다운로드 완료'
     })}>백업 파일 다운로드</button></section>
+    {org && <details className="compact"><summary>신고 원장 전체 삭제</summary>
+      <form className="panel" onSubmit={e=>{
+        e.preventDefault()
+        if (!backedUp || resetText!=='모두리셋') return
+        void action.run(async()=>{
+          const result = await send<{count:number}>(prefix+'/data/lines/reset',{confirmation:resetText})
+          setResetText('')
+          setBackedUp(false)
+          await Promise.all(['data/lines','line-checks'].map(key=>client.invalidateQueries({queryKey:[prefix+'/'+key]})))
+          return `원장 ${result.count.toLocaleString('ko-KR')}행을 비웠습니다.`
+        })
+      }}>
+        <p><b>{org.name}</b>의 활성 신고 원장 전체를 비웁니다. 원본 파일, 계산 이력 및 확정본은 보존됩니다.</p>
+        <p>백업 파일을 내려받아 보관한 뒤 <strong>모두리셋</strong>을 입력하세요.</p>
+        <div className="toolbar">
+          <label>리셋 확인 문구<input autoComplete="off" value={resetText} onChange={e=>setResetText(e.target.value)}/></label>
+          <button className="danger" disabled={action.busy||!backedUp||resetText!=='모두리셋'}>모든 행 비우기</button>
+        </div>
+      </form>
+    </details>}
     <p className="status" role="status">{action.status}</p>
+  </>
+}
+
+type Review = {
+  missing:number[]; saved:boolean
+  results:(Pick<Detail,'ready'|'summary'|'actual_usd'|'attributed_usd'|'actual_kg'> & {
+    year:number; id:number; cutoff:string; checks:(Problem & {member_id?:number; subject?:string})[]
+  })[]
+  history:{first_run:number; second_run:number; time:string}[]
+}
+
+function SubmissionWorkspace({org,fields}: {org:Org;fields?:Record<'members'|'lines',Fields>}) {
+  const prefix = `org/${org.id}`
+  const [params,setParams] = useSearchParams()
+  const action = useAction()
+  const client = useQueryClient()
+  const policies = useQuery({queryKey:[prefix+'/policies'],queryFn:()=>get<{year:number}[]>(prefix+'/policies')})
+  const runs = useQuery({queryKey:[prefix+'/runs'],queryFn:()=>get<Run[]>(prefix+'/runs')})
+  const years = [...new Set([...(policies.data??[]),...(runs.data??[])].map(item=>item.year))].sort((a,b)=>b-a)
+  const requested = Number(params.get('year'))
+  const year = years.includes(requested) ? requested : years[0]
+  const path = prefix+'/submission-review?year='+year
+  const review = useQuery({queryKey:[path],queryFn:()=>get<Review>(path),enabled:year!==undefined,refetchOnMount:'always'})
+  const data = review.data
+  const [prior,current] = data?.results ?? []
+  const complete = !!prior && !!current
+  const annualPath = (first:number,second:number) => `${prefix}/annual-submission?previous_id=${first}&run_id=${second}`
+  const currentPath = complete ? annualPath(prior.id,current.id) : ''
+  const returnTo = encodeURIComponent('/submission?year='+year)
+  const error = policies.error ?? runs.error ?? review.error
+  return <>
+    <section className="panel">
+      <div className="toolbar">
+        <label>실적 연도<select aria-label="실적 연도" value={year??''} disabled={action.busy}
+          onChange={e=>setParams({year:e.target.value})}>
+          {!years.length&&<option value="">정책 등록 필요</option>}
+          {years.map(value=><option key={value} value={value}>{value}년</option>)}
+        </select></label>
+        {data && !data.missing.length && !complete && <button className="primary" disabled={action.busy||review.isFetching}
+          onClick={()=>action.run(async()=>{
+            client.setQueryData([path],await send<Review>(path))
+            await runs.refetch()
+            return '현재 자료 검토를 완료했습니다.'
+          })}>현재 자료 검토</button>}
+      </div>
+      {year!==undefined&&<p>제출 대상 실적 <b>{year-1}년 · {year}년</b></p>}
+      {!!data?.missing.length && <p>
+        <NavLink to="/settings#calculation-policy">{data.missing.join('년, ')}년 계산 정책 등록</NavLink></p>}
+      {year===undefined&&policies.isSuccess&&runs.isSuccess&&<NavLink to="/settings#calculation-policy">연도별 정책 등록</NavLink>}
+      {!!data?.history.length && !data.saved && <p className="pill pill-warning">확정 이후 자료 변경 또는 재검토 · 이전 확정본 보관됨</p>}
+      {data && !complete && !data.missing.length && <p>현재 자료로 두 연도의 실적을 검토하세요.</p>}
+      {complete && <div className="toolbar">
+        <button disabled={action.busy||review.isFetching} onClick={()=>action.run(async()=>{
+          await download(currentPath,'POST')
+          return '초안 다운로드 완료'
+        })}>초안 다운로드</button>
+        <button className="primary" disabled={action.busy||review.isFetching||review.isError||!prior.ready||!current.ready} onClick={()=>{
+          if (!data?.saved&&!window.confirm('검토한 두 연도의 제출자료를 확정하시겠습니까?')) return
+          void action.run(async()=>{
+            try { await download(currentPath+'&final=true&require_current=true','POST') }
+            finally { await review.refetch() }
+            return '확정본 다운로드 완료'
+          })
+        }}>{data?.saved?'현재 확정본 다운로드':'최종 확정 후 제출용 Excel 다운로드'}</button>
+      </div>}
+      <p role="status">{action.status || error?.message || (review.isFetching?'현재 자료를 확인하는 중…':'')}</p>
+    </section>
+    {data?.results.slice().reverse().map(result=><section key={result.year} className="panel">
+      <h2>{result.year}년 실적 검토</h2>
+      <p>회원자격 기준일 {result.cutoff} · {result.ready?'검증 통과':`보완 필요 ${result.checks.length}건`}</p>
+      {!result.ready && <Table rows={result.checks.map(problem=>({...problem,
+        field:(problem.member_id?fields?.members:fields?.lines)?.[problem.field]??'기타 항목',
+      }))} fields={{subject:'회원사명 또는 신고번호',field:'항목',message:'보완 내용'}} editLabel="수정하기"
+        editLink={row=>row.member_id ? `/members?row=${row.member_id}&return=${returnTo}` :
+          row.row_id ? `/lines?row=${row.row_id}&return=${returnTo}` : undefined}/>}
+      <p>신고 기준 실수출액 <b>{formatNumber(result.actual_usd)} USD</b> · 회원사 귀속 인정액 <b>{formatNumber(result.attributed_usd)} USD</b>
+        {result.actual_kg!==null&&result.actual_kg!=='0'&&<> · 신고 기준 순중량 <b>{formatNumber(result.actual_kg)} kg</b></>}</p>
+      <details className="compact" open={result.ready}><summary>회원사별 실적</summary>
+        <Table rows={result.summary} fields={{name:'회원사명',direct_usd:'직접 USD',indirect_usd:'간접 USD',total_usd:'합계 USD'}}/>
+        <NavLink to={`/results?run=${result.id}`}>신고별 인정 근거 보기</NavLink>
+      </details>
+    </section>)}
+    {!!data?.history.length && <details className="compact"><summary>보관된 확정본</summary>
+      {data.history.map(item=><div className="toolbar" key={item.second_run+':'+item.first_run}>
+        <span>검토 시각 {item.time.slice(0,16).replace('T',' ')}</span>
+        <button disabled={action.busy} onClick={()=>action.run(async()=>{
+          await download(annualPath(item.first_run,item.second_run)+'&final=true','POST')
+          return '보관된 확정본 다운로드 완료'
+        })}>보관본 다운로드</button>
+      </div>)}
+    </details>}
   </>
 }
 
 function RunWorkspace({org,mode,fields}: {org:Org;mode:string;fields?:Record<'members'|'lines',Fields>}) {
   const prefix = `org/${org.id}`
-  const [year,setYear]=useState(mode==='submission'?'':String(new Date().getFullYear()))
+  const [year,setYear]=useState(String(new Date().getFullYear()))
   const [params]=useSearchParams()
   const [runId,setRunId]=useState(params.get('run')??'')
   const [number,setNumber]=useState('')
@@ -193,77 +301,16 @@ function RunWorkspace({org,mode,fields}: {org:Org;mode:string;fields?:Record<'me
   const action=useAction()
   const runs=useQuery({queryKey:[prefix+'/runs'],queryFn:()=>get<Run[]>(prefix+'/runs')})
   const current=runId || String(runs.data?.[0]?.id ?? '')
-  const detail=useQuery({queryKey:[prefix,'run',current],queryFn:()=>get<Detail>(`${prefix}/runs/${current}`),enabled:!!current && mode!=='submission'})
-  const policies=useQuery({queryKey:[prefix+'/policies'],queryFn:()=>get<{year:number}[]>(prefix+'/policies'),enabled:mode==='submission'})
-  const years=[...new Set([...(policies.data??[]),...(runs.data??[])].map(item=>item.year))].sort((a,b)=>b-a)
-  const submissionYear=years.includes(Number(year))?Number(year):years[0]
-  const annualRuns=runs.data?.filter(run=>run.year===submissionYear)??[]
-  const selectedRun=annualRuns.find(run=>String(run.id)===runId)??annualRuns[0]
-  const previousYear=submissionYear===undefined?undefined:submissionYear-1
-  const previousRun=runs.data?.find(run=>run.year===previousYear)
-  const hasPolicies=[submissionYear,previousYear].every(value=>policies.data?.some(policy=>policy.year===value))
-  const annualPath=prefix+'/annual-submission?run_id='+selectedRun?.id+'&previous_id='+previousRun?.id
-  const readiness=useQuery({queryKey:[annualPath],queryFn:()=>get<Readiness>(annualPath),
-    enabled:mode==='submission'&&!!selectedRun&&!!previousRun})
+  const detail=useQuery({queryKey:[prefix,'run',current],queryFn:()=>get<Detail>(`${prefix}/runs/${current}`),enabled:!!current})
   const history=useQuery({queryKey:[prefix,'history',rowId],queryFn:()=>get<Row[]>(prefix+'/audit'+(rowId?'?row_id='+rowId:'')),
     enabled:mode==='audit'||!!rowId})
   const evidence=useQuery({queryKey:[prefix,'evidence',current,rowId],queryFn:()=>get<{row:Row;source:Row|null;decisions:Row[]}>(`${prefix}/runs/${current}/evidence/${rowId}`),
     enabled:!!rowId && !!current})
   const data=detail.data
-  const chooser=(value:string,change:(value:string)=>void, label:string, filter?:number)=>
+  const chooser=(value:string,change:(value:string)=>void, label:string)=>
     <label><span>{label} <HelpTip text="계산할 때마다 생성되는 번호입니다. 선택한 실행 당시의 계산 및 검증 결과를 조회합니다."/></span><select aria-label={label} value={value} onChange={e=>change(e.target.value)}><option value="">선택</option>
-      {runs.data?.filter(r=>!filter||r.year===filter).map(r=><option key={r.id} value={r.id}>{mode==='audit'
+      {runs.data?.map(r=><option key={r.id} value={r.id}>{mode==='audit'
         ? `#${r.id} · ${r.time.slice(0,10)}` : `${r.year}년 · #${r.id} · ${r.time}`}</option>)}</select></label>
-  if (mode==='submission') {
-    const result=readiness.data
-    const canFinalize=!!result&&!result.blocker&&!readiness.isFetching
-    return <section className="panel submission-panel">
-      <h2>연도별 공동정산 수출실적</h2>
-      <p className="muted">품목 {org.name}</p>
-      <div className="toolbar">
-        <label><span>실적 연도 <HelpTip text="수출실적을 조회하거나 계산할 연도입니다."/></span><select aria-label="실적 연도" value={submissionYear??''} onChange={e=>{setYear(e.target.value);setRunId('')}}>
-          {!years.length&&<option value="">정책 등록 필요</option>}
-          {years.map(value=><option key={value} value={value}>{value}년</option>)}
-        </select></label>
-        <button className={canFinalize?undefined:'primary'} disabled={action.busy||!hasPolicies} onClick={()=>action.run(async()=>{
-          const prior=await send<{ready:boolean}>(prefix+'/runs?year='+previousYear)
-          const run=await send<{id:number;ready:boolean}>(prefix+'/runs?year='+submissionYear)
-          await runs.refetch()
-          setYear(String(submissionYear))
-          setRunId(String(run.id))
-          return prior.ready&&run.ready?'두 연도 계산을 완료했습니다.':'계산 결과를 검토하세요.'
-        })}>두 연도 계산</button>
-      </div>
-      <p>제출자료에는 선택한 연도와 직전 연도의 실적이 포함됩니다. 자료를 수정했다면 두 연도를 다시 계산하세요.</p>
-      {annualRuns.length>0&&<details className="compact"><summary>계산 기록 선택</summary>
-        <div className="toolbar">{chooser(String(selectedRun?.id??''),setRunId,'계산 실행번호',submissionYear)}</div>
-      </details>}
-      {submissionYear!==undefined&&<p>출력 연도 <b>{previousYear}년 · {submissionYear}년</b></p>}
-      {submissionYear!==undefined&&!hasPolicies&&<p><NavLink to="/settings#calculation-policy">두 연도의 계산 정책을 등록하세요.</NavLink></p>}
-      {hasPolicies&&(!selectedRun||!previousRun)&&<p>제출 전에 두 연도를 계산하세요.</p>}
-      {result&&<p>회원 기준일 <b>{previousYear}년 {result.previous_cutoff} · {submissionYear}년 {result.cutoff}</b> · {result.saved?'확정본 보관됨':result.blocker??'확정 가능'}</p>}
-      {result?.blocker&&<div className="toolbar">
-        <NavLink to={'/calculate?run='+selectedRun?.id}>{submissionYear}년 검증 열기</NavLink>
-        <NavLink to={'/calculate?run='+previousRun?.id}>{previousYear}년 검증 열기</NavLink>
-      </div>}
-      {!years.length&&!policies.isLoading&&<NavLink to="/settings#calculation-policy">연도별 정책 등록</NavLink>}
-      <div className="toolbar">
-        <button disabled={!selectedRun||!previousRun||action.busy} onClick={()=>action.run(async()=>{
-          await download(annualPath,'POST')
-          return '초안 다운로드 완료'
-        })}>초안 다운로드</button>
-        <button className="primary" disabled={!canFinalize||action.busy} onClick={()=>{
-          if (!result?.saved&&!window.confirm('선택 연도의 제출자료를 확정하시겠습니까?')) return
-          void action.run(async()=>{
-            try { await download(annualPath+'&final=true','POST') }
-            finally { void readiness.refetch() }
-            return '확정본 다운로드 완료'
-          })
-        }}>{result?.saved?'제출용 Excel 다운로드':'최종 확정 후 제출용 Excel 다운로드'}</button>
-      </div>
-      <p role="status">{action.status||(readiness.isError?(readiness.error as Error).message:'')}</p>
-    </section>
-  }
   return <>
     <section className="panel">
       {mode==='calculate' && <form className="toolbar" onSubmit={e=>{e.preventDefault(); void action.run(async()=>{
@@ -274,7 +321,7 @@ function RunWorkspace({org,mode,fields}: {org:Org;mode:string;fields?:Record<'me
         <button className="primary" disabled={action.busy}>수출실적 계산</button>
         <NavLink to="/settings#calculation-policy">연도별 계산 정책</NavLink>
       </form>}
-      {mode==='results'&&<div className="toolbar"><NavLink className="button primary" to="/submission">제출자료 준비</NavLink></div>}
+      {mode==='results'&&<div className="toolbar"><NavLink className="button primary" to="/submission">제출자료</NavLink></div>}
       <details className="compact" open={mode==='audit'||mode==='checks'||undefined}>
         <summary>계산 기록 상세</summary>
         {data&&<p className="muted">계산 규칙 버전 {data.rule}</p>}
@@ -291,7 +338,7 @@ function RunWorkspace({org,mode,fields}: {org:Org;mode:string;fields?:Record<'me
       <p className="status" role="status">{action.status || (detail.isError ? (detail.error as Error).message : '')}</p></section>
     {data && <>
       <div className="metrics">{[['신고 기준 실수출액',data.actual_usd,'USD'],['회원사 귀속 인정액',data.attributed_usd,'USD'],
-        ['신고 기준 순중량',data.actual_kg,'kg'],['검증 통과 품목란',data.accepted_lines,'건']].map(([label,value,unit]) =>
+        ['신고 기준 순중량',data.actual_kg,'kg'],['검증 통과 품목란',data.accepted_lines,'건']].filter(([,value])=>value!==null).map(([label,value,unit]) =>
         <div className="metric" key={label}><span>{label}</span><strong>{value===null?'미집계':formatNumber(value)}</strong> <small>{value===null?'':unit}</small></div>)}</div>
       <p className={`pill ${data.ready?'pill-success':'pill-warning'}`}>{data.ready?'계산 검증 통과':'계산 보완 필요'}</p>
       {mode==='calculate'&&!data.ready&&<div className="toolbar">
@@ -330,10 +377,9 @@ function RunWorkspace({org,mode,fields}: {org:Org;mode:string;fields?:Record<'me
 function Help() {
   return <section className="panel guide"><h2>공동정산 업무 순서</h2><ol>
     <li><NavLink to="/settings">프로그램 설정</NavLink>에서 품목을 등록하고 연도별 회원 기준일, 귀속일, 대상 HS코드를 저장합니다.</li>
-    <li><NavLink to="/members">회원사 등록·수정</NavLink>에서 명부를 등록합니다. 역할 사업자는 사업자번호와 등록 이름 또는 별칭으로 대조합니다.</li>
-    <li><NavLink to="/lines">수출신고필증 입력·수정</NavLink>에서 금액, 물량 및 역할을 입력합니다. 한 신고에 품목란이 여러 개이거나 정정 신고라면 입력 화면에서 해당 항목을 펼쳐 원본 값을 확인하세요.</li>
-    <li>실적 계산에서 보완이 필요한 행은 <b>신고 행 열기</b>로 바로 수정할 수 있습니다. 수정한 뒤 저장하고 실적을 다시 계산하세요.</li>
-    <li>회원사별 실적을 확인한 뒤 <NavLink to="/submission">제출자료 준비</NavLink>에서 실적 연도를 선택하고 두 연도를 계산합니다. 검증을 통과하면 제출용 Excel을 내려받습니다.</li>
+    <li><NavLink to="/members">회원사 명부</NavLink>에서 명부를 등록합니다. 역할 사업자는 사업자번호와 등록 이름 또는 별칭으로 대조합니다.</li>
+    <li><NavLink to="/lines">신고 원장</NavLink>에 신고필증을 등록합니다. 한 신고에 품목란이 여러 개이거나 정정 신고라면 해당 항목을 펼쳐 원본 값을 확인하세요.</li>
+    <li><NavLink to="/submission">제출자료</NavLink>에서 실적 연도를 선택하고 현재 자료를 검토합니다. 보완할 건을 수정하고 회원사별 실적을 확인한 뒤 제출용 Excel을 확정합니다.</li>
   </ol><h2>인정 기준</h2><p>대행자와 화주는 직접수출 자격, 제조자는 간접수출 자격을 가집니다. 같은 사업자가 두 자격을 갖는 경우 직접수출을 한 번 인정합니다.</p>
   <p>동일 신고 품목란의 실제 수출액은 한 번 집계합니다. 서로 다른 회원사에는 해당 역할에 따른 실적이 각각 귀속됩니다.</p></section>
 }
@@ -344,24 +390,15 @@ function MenuLink({item:[path,label,description]}: {item:typeof menus[number]}) 
 
 function WorkMenu() {
   const {pathname,search} = useLocation()
-  const management=menus.slice(6,9)
+  const management=[...menus.slice(6,9),menus[9]]
   const active=management.some(([path])=>path===pathname)
   return <nav className="work-menu" aria-label="업무 메뉴">
     <MenuLink item={menus[0]}/>
-    <div role="group" aria-labelledby="entry-menu" className="menu-group">
-      <span id="entry-menu">자료 입력</span>
-      {menus.slice(1,3).map(item=><MenuLink key={item[0]} item={item}/>)}
-    </div>
-    <div role="group" aria-labelledby="results-menu" className="menu-group">
-      <span id="results-menu">실적 계산·확인</span>
-      {menus.slice(3,5).map(item=><MenuLink key={item[0]} item={item}/>)}
-    </div>
-    <MenuLink item={menus[5]}/>
+    {[menus[1],menus[2],menus[5]].map(item=><MenuLink key={item[0]} item={item}/>)}
     <details className="management-menu" key={pathname+search} open={active}>
       <summary>설정·관리</summary>
       {management.map(item=><MenuLink key={item[0]} item={item}/>)}
     </details>
-    <MenuLink item={menus[9]}/>
   </nav>
 }
 
@@ -399,6 +436,7 @@ function App() {
             <LedgerGrid key={org.id+path} org={org.id} kind={path==='/members'?'members':'lines'}
               fields={fields.data[path==='/members'?'members':'lines']}/>
           </Suspense>) :
+          path==='/submission'?<SubmissionWorkspace key={org.id} org={org} fields={fields.data}/> :
           <RunWorkspace key={org.id+path+location.search} org={org} mode={path.slice(1)} fields={fields.data}/>))}
       </>}/>)}</Routes></div>
     </main></div>

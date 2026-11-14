@@ -1,3 +1,4 @@
+import { NavLink } from 'react-router-dom'
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { AgGridReact } from 'ag-grid-react'
@@ -74,14 +75,12 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
   const [hidden, setHidden] = useState<string[]>(() => kind==='lines' ? Object.keys(displayFields).filter(key=>!defaultLineFields.includes(key)) : [])
   const [showExtras, setShowExtras] = useState(false)
   const [showIdentity, setShowIdentity] = useState(false)
-  const [resetText, setResetText] = useState('')
   const [issueRows, setIssueRows] = useState<{row: number; issues: Problem[]}[]>([])
   const validation = useRef(0)
   const grid = useRef<GridApi<Row> | null>(null)
   const nextIssue = useRef(0)
   const form = useRef<HTMLFormElement>(null)
   const excelFile = useRef<HTMLInputElement>(null)
-  const resetDialog = useRef<HTMLDialogElement>(null)
   const dirty = selected && Object.keys(fields).some(key => String(selected[key] ?? '') !== String(draft[key] ?? ''))
   const visibleRows = useMemo(() => problemOnly ? rows.filter(row=>rowChecks[String(row.id)]?.some(p=>p.severity!=='INFO')) : rows,
     [rows, problemOnly, rowChecks])
@@ -144,7 +143,7 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
     const row = rows.find(row=>row.id===id)
     if (row) select(row)
   })
-  const requestedId = kind==='lines' && params.has('row') && !query.isFetching
+  const requestedId = params.has('row') && !query.isFetching
     ? rows.find(row=>String(row.id)===params.get('row'))?.id : undefined
   const openedRow = useRef<number>(undefined)
   useEffect(()=>{
@@ -215,7 +214,7 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
       }}/>}
       <details className="excel-menu"><summary className="button">Excel 가져오기·내보내기</summary>
         <div className="menu-items" onClick={event=>event.currentTarget.parentElement?.removeAttribute('open')}>
-        <button disabled={busy} onClick={()=>excelFile.current?.click()}>Excel 업로드</button>
+        <button disabled={busy} onClick={()=>excelFile.current?.click()}>Excel에서 가져오기</button>
         <button disabled={busy} onClick={() => action(async () => { await download(`org/${org}/export/${kind}`); setMessage('다운로드 완료') })}>Excel 다운로드</button>
         <button disabled={busy} onClick={() => action(async () => { await download(`org/${org}/export/${kind}?template=true`); setMessage('표준 양식 다운로드 완료') })}>표준 양식</button>
         </div>
@@ -223,41 +222,10 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
       <input ref={excelFile} hidden type="file" accept=".xlsx" disabled={busy} onChange={e => {
         const file = e.target.files?.[0]; e.target.value=''; if (file) void action(() => upload(file))
       }}/>
-      <button className={selected?undefined:"primary"} disabled={busy} onClick={() => select()}>{kind==='lines'?'신고필증 추가':'회원사 추가'}</button>
-      {kind==='lines' && <button className="danger" disabled={busy || !rows.length} onClick={()=>{
-        setResetText('')
-        resetDialog.current?.showModal()
-      }}>전체 삭제</button>}
+      <button className={selected?undefined:"primary"} disabled={busy} onClick={() => select()}>{kind==='lines'?'직접 입력':'회원사 추가'}</button>
     </div>
-    {kind==='lines' && <dialog ref={resetDialog} className="reset-dialog" aria-labelledby="reset-title"
-      onCancel={event=>{if (busy) event.preventDefault()}}>
-      <form onSubmit={event=>{
-        event.preventDefault()
-        if (resetText!=='모두리셋' || busy) return
-        void action(async()=>{
-          const result=await send<{count:number}>(path+'/reset',{confirmation:resetText})
-          ++validation.current
-          setSelected(undefined)
-          setDraft({})
-          setIssues([])
-          setIssueRows([])
-          resetDialog.current?.close()
-          setMessage(`원장 ${result.count.toLocaleString('ko-KR')}행을 비웠습니다.`)
-          await reload()
-        })
-      }}>
-        <h2 id="reset-title">원장 전체 리셋</h2>
-        <p>선택한 품목의 원장 전체 {rows.length.toLocaleString('ko-KR')}행을 비웁니다. 원본 파일, 계산 이력 및 확정본은 보존됩니다.</p>
-        <label><span>확인 문구 <strong>모두리셋</strong> <HelpTip text="정확히 입력하면 선택한 품목의 원장 전체를 비울 수 있습니다."/></span>
-          <input aria-label="리셋 확인 문구" autoComplete="off" value={resetText} disabled={busy} onChange={event=>setResetText(event.target.value)}/>
-        </label>
-        <p role="alert">{message}</p>
-        <div className="toolbar">
-          <button type="button" disabled={busy} onClick={()=>resetDialog.current?.close()}>취소</button>
-          <button type="submit" className="danger danger-confirm" disabled={busy||resetText!=='모두리셋'}>{busy?'처리 중…':'모든 행 비우기'}</button>
-        </div>
-      </form>
-    </dialog>}
+    {params.get('return')?.startsWith('/submission?year=') &&
+      <NavLink className="button" to={params.get('return')!}>제출 검토로 돌아가기</NavLink>}
     <details className="compact"><summary>열 표시</summary>
       <div className="checklist">{Object.entries(displayFields).map(([key,label]) => <label key={key}>
         <input type="checkbox" checked={!hidden.includes(key)} onChange={e => setHidden(e.target.checked ? hidden.filter(k => k!==key) : [...hidden,key])}/>

@@ -148,7 +148,7 @@ export function OcrInput({org, fields, members, disabled, onSaved}: {
   const orderedFields = ['number','line','version','hs','usd','kg','declared','shipped','accepted',
     ...Object.keys(fields).filter(key=>!['number','line','version','hs','usd','kg','declared','shipped','accepted','fob','maker_state'].includes(key))]
   return <>
-    <button type="button" disabled={disabled} onClick={()=>dialog.current?.showModal()}>OCR 입력</button>
+    <button type="button" disabled={disabled} onClick={()=>dialog.current?.showModal()}>PDF에서 가져오기</button>
     <dialog ref={dialog} className="ocr-dialog" aria-labelledby="ocr-title"
       onDragEnter={event=>{
         if (!event.dataTransfer.types.includes('Files')) return
@@ -173,7 +173,7 @@ export function OcrInput({org, fields, members, disabled, onSaved}: {
       }}
       onCancel={event=>{event.preventDefault(); close()}}>
       <header className="toolbar">
-        <h2 id="ocr-title">OCR 입력</h2>
+        <h2 id="ocr-title">PDF에서 가져오기</h2>
         <span className="toolbar-spacer"/>
         <button type="button" disabled={busy} onClick={close}>닫기</button>
       </header>

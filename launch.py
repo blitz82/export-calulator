@@ -13,15 +13,45 @@ import uvicorn
 from epms.api import create_app
 
 
+WEBVIEW2_DOWNLOAD = "https://developer.microsoft.com/microsoft-edge/webview2/#download"
+
+
+def has_webview2():
+    import winreg
+
+    key = r"SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
+    for root, access in ((winreg.HKEY_LOCAL_MACHINE, winreg.KEY_READ | winreg.KEY_WOW64_32KEY),
+                         (winreg.HKEY_CURRENT_USER, winreg.KEY_READ)):
+        try:
+            with winreg.OpenKey(root, key, 0, access) as handle:
+                version, kind = winreg.QueryValueEx(handle, "pv")
+            parts = version.split(".") if kind == winreg.REG_SZ else []
+            if len(parts) == 4 and all(part.isascii() and part.isdecimal() for part in parts) and any(map(int, parts)):
+                return True
+        except OSError:
+            continue
+    return False
+
+
+def show_webview2_download():
+    message = (
+        "Microsoft Edge WebView2 Runtime을 설치한 뒤 프로그램을 다시 실행하세요.\n\n"
+        "Microsoft 다운로드 페이지에서 Evergreen Bootstrapper 또는 x64 독립 실행형 설치 파일을 선택하세요.\n"
+        f"{WEBVIEW2_DOWNLOAD}\n\n"
+        "지금 다운로드 페이지를 열까요?"
+    )
+    if ctypes.windll.user32.MessageBoxW(None, message, "WebView2 설치 필요", 0x124) == 6:
+        os.startfile(WEBVIEW2_DOWNLOAD)
+
+
 def desktop(app, server, listener, port):
     import webview
 
     packaged = getattr(sys, "frozen", False)
     runtime = (Path(sys.executable).parent / "WebView2" if packaged
                else Path(__file__).resolve().parent / "build" / "WebView2")
-    if not (runtime / "msedgewebview2.exe").is_file():
-        raise RuntimeError("배포 폴더에서 WebView2 런타임을 찾을 수 없습니다. ZIP 전체를 로컬 디스크에 풀어 주세요.")
-    if sys.getwindowsversion().build < 22000:
+    fixed_runtime = (runtime / "msedgewebview2.exe").is_file()
+    if fixed_runtime and sys.getwindowsversion().build < 22000:
         # Fixed WebView2 on Windows 10 runs its renderer in an AppContainer.
         result = subprocess.run(
             [str(Path(os.environ["SystemRoot"]) / "System32" / "icacls.exe"), str(runtime),
@@ -30,9 +60,12 @@ def desktop(app, server, listener, port):
         )
         if result.returncode:
             raise RuntimeError("WebView2 폴더의 읽기 권한을 설정할 수 없습니다. 쓰기 가능한 로컬 폴더에 압축을 풀어 주세요.")
-    os.environ["WEBVIEW2_BROWSER_EXECUTABLE_FOLDER"] = str(runtime)
+    if fixed_runtime:
+        os.environ["WEBVIEW2_BROWSER_EXECUTABLE_FOLDER"] = str(runtime)
+    else:
+        os.environ.pop("WEBVIEW2_BROWSER_EXECUTABLE_FOLDER", None)
     os.environ.pop("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", None)
-    webview.settings.update(WEBVIEW2_RUNTIME_PATH=str(runtime), ALLOW_DOWNLOADS=True,
+    webview.settings.update(WEBVIEW2_RUNTIME_PATH=str(runtime) if fixed_runtime else None, ALLOW_DOWNLOADS=True,
                             ALLOW_FILE_URLS=False, OPEN_EXTERNAL_LINKS_IN_BROWSER=False)
     thread = threading.Thread(target=server.run, kwargs={"sockets": [listener]}, daemon=True)
     thread.start()
@@ -59,6 +92,11 @@ def main():
     parser.add_argument("--db")
     parser.add_argument("--no-browser", action="store_true")
     args = parser.parse_args()
+    if not args.no_browser and getattr(sys, "frozen", False):
+        fixed_runtime = Path(sys.executable).parent / "WebView2" / "msedgewebview2.exe"
+        if not fixed_runtime.is_file() and not has_webview2():
+            show_webview2_download()
+            return
     app = create_app(args.db)
     with socket.socket() as listener:
         listener.bind(("127.0.0.1", args.port))

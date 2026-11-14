@@ -527,6 +527,16 @@ def create_app(path=None):
             store.log(conn, org, actor(request), "계산 정책", year, policy.reason, previous, data)
         return data
 
+    def save_calculation(conn, org, name, policy, rows, members, request):
+        year = policy["year"]
+        result = rules.calculate(rows, members, policy)
+        result.update(rule=rules.VERSION, policy=policy, organization=name, rows=rows, members=members)
+        stamp = store.now()
+        run_id = conn.execute(store.runs.insert().values(org=org, year=year, time=stamp,
+                              data=result)).inserted_primary_key[0]
+        store.log(conn, org, actor(request), "계산 실행", run_id, "계산", None, {"year": year, "rule": rules.VERSION})
+        return run_id, stamp, result
+
     @app.post("/api/org/{org}/runs")
     def calculate(org: int, year: int, request: Request):
         with db.begin() as conn:
@@ -537,12 +547,7 @@ def create_app(path=None):
                 fail("설정에서 귀속연도, 회원자격 기준일, 대상 HS코드를 등록하세요.")
             rows = store.records(conn, store.declarations, org)
             members = store.records(conn, store.memberships, org)
-            result = rules.calculate(rows, members, policy)
-            result.update(rule=rules.VERSION, policy=policy, organization=name, rows=rows, members=members)
-            stamp = store.now()
-            run_id = conn.execute(store.runs.insert().values(org=org, year=year, time=stamp,
-                                  data=result)).inserted_primary_key[0]
-            store.log(conn, org, actor(request), "계산 실행", run_id, "계산", None, {"year": year, "rule": rules.VERSION})
+            run_id, stamp, result = save_calculation(conn, org, name, policy, rows, members, request)
         return dict(id=run_id, time=stamp, ready=result["ready"])
 
     @app.get("/api/org/{org}/runs")
@@ -667,8 +672,50 @@ def create_app(path=None):
             return "제출양식의 회원 기준일은 2026-12-31입니다."
         return None
 
+    @app.api_route("/api/org/{org}/submission-review", methods=["GET", "POST"])
+    def submission_review(org: int, year: int, request: Request):
+        run_table, snapshot_table, policies = store.runs, store.submissions, store.policies
+        years = (year - 1, year)
+        with db.begin() as conn:
+            name = organization(conn, org)
+            rules_by_year = dict(conn.execute(select(policies.c.year, policies.c.data).where(
+                policies.c.org == org, policies.c.year.in_(years))).all())
+            missing = [value for value in years if value not in rules_by_year]
+            if missing and request.method == "POST":
+                fail("두 실적연도의 계산 정책을 등록하세요.")
+            rows = store.records(conn, store.declarations, org)
+            members = store.records(conn, store.memberships, org)
+            row_names = {r["id"]: r.get("number") for r in rows}
+            member_names = {m["id"]: m.get("name") for m in members}
+            results = []
+            for value in years:
+                policy = rules_by_year.get(value)
+                latest = conn.execute(select(run_table.c.id, run_table.c.data).where(
+                    run_table.c.org == org, run_table.c.year == value).order_by(run_table.c.id.desc()).limit(1)).first()
+                run_id, result = latest if latest else (None, None)
+                current = bool(result and result["rule"] == rules.VERSION and result["organization"] == name
+                               and result["policy"] == policy and result["rows"] == rows and result["members"] == members)
+                if request.method == "POST" and not current:
+                    run_id, _, result = save_calculation(conn, org, name, policy, rows, members, request)
+                    current = True
+                if current:
+                    checks = [dict(p, subject=row_names.get(p["row_id"])) for p in result["checks"] if p["severity"] != "INFO"]
+                    checks.extend(dict(p, subject=member_names.get(p["member_id"])) for p in result["member_issues"])
+                    results.append(dict(year=value, id=run_id, cutoff=policy["cutoff"], ready=result["ready"],
+                                        checks=checks, summary=rules.summarize(result["ledger"]),
+                                        actual_usd=result["actual_usd"], actual_kg=result["actual_kg"],
+                                        attributed_usd=sum((rules.Decimal(r["usd"]) for r in result["ledger"]), rules.Decimal(0))))
+            history = [dict(r) for r in conn.execute(select(snapshot_table.c.first_run, snapshot_table.c.second_run,
+                run_table.c.time).join(run_table, snapshot_table.c.second_run == run_table.c.id).where(
+                snapshot_table.c.org == org, snapshot_table.c.sheet == "annual-v2", run_table.c.year == year)
+                .order_by(snapshot_table.c.id.desc())).mappings()]
+            saved = len(results) == 2 and any(
+                (item["first_run"], item["second_run"]) == (results[0]["id"], results[1]["id"]) for item in history)
+            return dict(missing=missing, results=results, history=history, saved=saved)
+
     @app.api_route("/api/org/{org}/annual-submission", methods=["GET", "POST"])
-    def annual_submission(org: int, run_id: int, previous_id: int, request: Request, final: bool = False):
+    def annual_submission(org: int, run_id: int, previous_id: int, request: Request, final: bool = False,
+                          require_current: bool = False):
         table = store.submissions
         key = "annual-v2"
         with db.begin() as conn:
@@ -681,6 +728,16 @@ def create_app(path=None):
             existing = conn.execute(select(table.c.data).where(table.c.org == org, table.c.first_run == previous_id,
                                     table.c.second_run == run_id, table.c.sheet == key)).scalar()
             blocker = None
+            if require_current:
+                rows = store.records(conn, store.declarations, org)
+                members = store.records(conn, store.memberships, org)
+                policies = store.policies
+                for result in (previous, run):
+                    policy = conn.execute(select(policies.c.data).where(
+                        policies.c.org == org, policies.c.year == result["policy"]["year"])).scalar()
+                    if (result["rows"] != rows or result["members"] != members or result["policy"] != policy
+                            or result["organization"] != item or result["rule"] != rules.VERSION):
+                        fail("확정 이후 자료가 변경되었거나 검토 결과가 오래되었습니다. 현재 자료를 다시 검토하세요.", 409)
             if not existing:
                 for result in (previous, run):
                     reason = final_blocker(conn, org, result, annual=True)
