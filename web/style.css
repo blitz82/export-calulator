@@ -159,7 +159,8 @@ input[aria-invalid=true],select[aria-invalid=true],.ag-cell.cell-error,.ag-cell.
 .party-fields { display:grid; gap:8px; min-width:0; margin:0; padding:8px; border:1px solid #d5d5d5; }
 .party-fields legend { padding:0 4px; font-size:13px; font-weight:700; }
 .member-candidates { list-style:none; margin:4px 0 0; padding:0; display:grid; gap:3px; }
-.member-candidates button { width:100%; text-align:left; overflow-wrap:anywhere; }
+.member-candidates button { width:100%; text-align:left; overflow-wrap:anywhere; background:#eaf4ff; }
+.member-candidates button:hover { background:#dbeeff; }
 .ledger-grid .ag-cell, .ledger-grid .ag-header-cell { border-right:1px solid #dedede; }
 .ledger-grid .ag-cell { text-align:center; }
 .ledger-grid .ag-cell.cell-error, .ledger-grid .ag-cell.cell-warning { box-shadow:none; border-right-color:#dedede; }
