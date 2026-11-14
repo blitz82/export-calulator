@@ -37,9 +37,8 @@ def line(roles="ABC", **overrides):
 @pytest.mark.parametrize(("roles", "expected"), [
     ("AAA", {"A":"직접"}), ("ABA", {"A":"직접","B":"직접"}),
     ("ABC", {"A":"직접","B":"직접","C":"간접"}), ("XBC", {"B":"직접","C":"간접"}),
-    ("AXC", {"A":"직접","C":"간접"}), ("ABX", {"A":"직접","B":"직접"}),
-    ("XXC", {"C":"간접"}), ("AAB", {"A":"직접","B":"간접"}),
-    ("ABB", {"A":"직접","B":"직접"}), ("XXX", {}),
+    ("AXC", {"A":"직접","C":"간접"}), ("XXC", {"C":"간접"}),
+    ("AAC", {"A":"직접","C":"간접"}), ("ACC", {"A":"직접","C":"직접"}),
 ])
 def test_roles(roles, expected):
     result = rules.calculate([line(roles, usd="10000")], MEMBERS, POLICY)
@@ -64,6 +63,31 @@ def test_member_cannot_be_marked_non_member():
     result = rules.calculate([line(agent_state="회원사 아님")], MEMBERS, POLICY)
     assert "D045" in {p["code"] for p in result["checks"]}
     assert not result["ready"] and not result["ledger"]
+
+
+@pytest.mark.parametrize(("row", "code"), [
+    (line("ABX"), "D048"),
+    (line("XXX"), "D048"),
+    (line("ABB"), "D048"),
+    (line(maker="", maker_name="", maker_state="원본에 없음"), "D048"),
+    (line(maker_state="비회원 확인"), "D048"),
+    (line(maker_name="다른 업체"), "D044"),
+])
+def test_unconfirmed_producer_holds_entire_line(row, code):
+    result = rules.calculate([row], MEMBERS, POLICY)
+    assert not result["ready"] and result["accepted_lines"] == 0
+    assert result["ledger"] == result["decisions"] == []
+    assert result["actual_usd"] == result["actual_kg"] == "0"
+    assert code in {problem["code"] for problem in result["checks"]}
+
+
+def test_producer_requires_eligibility_on_cutoff():
+    members = [*MEMBERS[:2], MEMBERS[2] | {"kind":"복수"}]
+    assert rules.calculate([line()], members, POLICY)["ready"]
+    members[2] |= {"withdrawn":POLICY["cutoff"]}
+    result = rules.calculate([line()], members, POLICY)
+    assert not result["ready"] and result["accepted_lines"] == 0 and not result["ledger"]
+    assert "D049" in {problem["code"] for problem in result["checks"]}
 
 
 def test_dedup_and_distinct_lines():

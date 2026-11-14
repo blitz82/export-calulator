@@ -5,7 +5,7 @@ from collections import defaultdict
 from datetime import date
 from decimal import Decimal, InvalidOperation
 
-VERSION = "EPMS-1.1"
+VERSION = "EPMS-1.2"
 ROLES = ("agent", "owner", "maker")
 NON_MEMBER = "회원사 아님"
 NON_MEMBER_STATES = {NON_MEMBER, "비회원 확인"}
@@ -145,12 +145,20 @@ def validate_line(row, members, policy=None):
         name = company_name(row.get(role + "_name"))
         number = business_number(row.get(role))
         state = row.get(role + "_state")
+        member = members.get(number)
+        if role == "maker":
+            if (not member or member.get("kind") not in ("생산자", "복수")
+                    or state in NON_MEMBER_STATES or state == "원본에 없음"):
+                issues.append(issue("D048", role, "제조자를 생산자 회원사 명부에서 선택하세요."))
+                continue
+            if policy and not eligible(member, day(policy["cutoff"])):
+                issues.append(issue("D049", role, "제조자는 기준일에 회원 자격이 있는 생산자 회원사여야 합니다."))
+                continue
         if state == "원본에 없음" and not number and not name:
             continue
         if not valid_number(number):
             issues.append(issue("D043" if number else "D047", role, "역할의 사업자번호 또는 원본의 정보부재를 확인하세요."))
             continue
-        member = members.get(number)
         if member:
             known = [member["name"], *clean(member.get("aliases")).split("|")]
             if not name or name not in {company_name(x) for x in known if clean(x)}:

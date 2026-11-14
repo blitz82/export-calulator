@@ -8,6 +8,7 @@ import { useSearchParams } from 'react-router-dom'
 import { dateInputHelp, HelpTip, ledgerHelp } from './help-tip'
 import { OcrInput } from './ocr-input'
 import { PdfView, type PdfSource } from './pdf-view'
+import { ProducerSelect } from './producer-select'
 
 ModuleRegistry.registerModules([AllCommunityModule])
 const theme = themeQuartz.withParams({accentColor:'#222', fontFamily:'inherit', fontSize:12,
@@ -208,7 +209,7 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
       <label>자료 검색<input type="search" placeholder={kind==='lines'?'신고번호 또는 업체명':'업체명 또는 사업자번호'} value={search} onChange={e => setSearch(e.target.value)}/></label>
       {kind==='lines' && <button aria-pressed={problemOnly} onClick={()=>setParams(problemOnly?{}:{filter:'issues'})}>보완 필요만</button>}
       <div className="toolbar-spacer"/>
-      {kind==='lines' && <OcrInput org={org} fields={fields} disabled={busy} onSaved={async count=>{
+      {kind==='lines' && <OcrInput org={org} fields={fields} members={members.data} disabled={busy} onSaved={async count=>{
         setMessage(`OCR 승인 · 원장 ${count}행 등록`)
         await reload()
       }}/>}
@@ -301,6 +302,7 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
           const role=key.split('_')[0]
           const stateKey=role+'_state'
           const roleField=kind==='lines'&&roleKeys.has(role)
+          if (roleField&&key==='maker_state') return null
           const number=normalizeNumber(draft[role])
           const roleName=String(draft[role+'_name']??'').trim()
           const member=roleField&&members.data?.find(row=>normalizeNumber(row.number)===number)
@@ -323,7 +325,8 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
           const queryName = memberName ? normalizeCompany(roleName) : ''
           const candidates = queryName && !matches ? (members.data??[])
             .map(row=>({row,rank:Math.min(...memberNames(row).map(name=>nameRank(queryName,name)))}))
-            .filter(({row,rank})=>/^\d{10}$/.test(normalizeNumber(row.number))&&Number.isFinite(rank))
+            .filter(({row,rank})=>/^\d{10}$/.test(normalizeNumber(row.number))&&Number.isFinite(rank)&&
+              (role!=='maker'||row.kind==='생산자'||row.kind==='복수'))
             .sort((a,b)=>a.rank-b.rank)
             .slice(0,5) : []
           const inputId=`ledger-${kind}-${key}`
@@ -373,6 +376,11 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
             {entries.filter(([key])=>!roleKeys.has(key.split('_')[0])&&!extraLineFields.has(key)).map(renderField)}
             {[...roleKeys].map(role=><fieldset className="party-fields" key={role}>
               <legend>{fields[role+'_name']}</legend>
+              {role==='maker' && <ProducerSelect members={members.data} onSelect={member=>{
+                const next={...draft,maker:String(member.number),maker_name:String(member.name),maker_state:''}
+                setDraft(next)
+                void validate(next)
+              }}/>}
               {entries.filter(([key])=>key.split('_')[0]===role).map(renderField)}
             </fieldset>)}
             {showExtras&&entries.filter(([key])=>extraLineFields.has(key)).map(renderField)}

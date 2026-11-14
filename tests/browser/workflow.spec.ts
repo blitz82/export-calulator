@@ -37,7 +37,8 @@ test('새 품목에서 회원사와 신고를 입력하고 제출용 Excel 확�
     agent:'1234567834',agent_name:'포도 협동조합',owner:'1234567829',owner_name:'미가입 수출업체',
   })) await page.locator(`input[name="${field}"]`).fill(value)
   await page.locator('select[name="owner_state"]').selectOption('회원사 아님')
-  await page.locator('select[name="maker_state"]').selectOption('원본에 없음')
+  await page.getByLabel('생산자 회원사 선택').selectOption({label:'포도 협동조합 · 1234567834'})
+  await expect(page.locator('input[name="maker"]')).toHaveValue('1234567834')
   await page.getByRole('button',{name:'저장',exact:true}).click()
   await expect(page.getByRole('status')).toContainText('저장됨')
   expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(820)
@@ -114,7 +115,7 @@ test('역할은 명부 자동 대조 후 예외만 확인', async ({page, reques
   await expect(page.locator('input[name="agent"]')).toHaveValue('1234567815')
   await expect(page.getByText('수출대행자 · 회원사 명부 자동 대조 완료')).toBeVisible()
   await expect(page.locator('select[name="agent_state"]')).toHaveCount(0)
-  for (const role of ['agent','owner','maker']) {
+  for (const role of ['agent','owner']) {
     await page.locator(`input[name="${role}_name"]`).fill('미가입 수출업체')
     await page.locator(`input[name="${role}"]`).fill('1234567829')
     await page.locator(`select[name="${role}_state"]`).selectOption('회원사 아님')
@@ -122,6 +123,11 @@ test('역할은 명부 자동 대조 후 예외만 확인', async ({page, reques
   await page.locator('input[name="agent_name"]').fill('등록 업체')
   await page.locator('input[name="agent"]').fill('1234567815')
   await expect(page.locator('select[name="agent_state"]')).toHaveCount(0)
+  await page.locator('input[name="maker"]').fill('1234567829')
+  await expect(page.locator('input[name="maker"]')).toHaveAttribute('aria-invalid','true')
+  await expect(page.locator('select[name="maker_state"]')).toHaveCount(0)
+  await page.getByLabel('생산자 회원사 선택').selectOption({label:'등록 업체 · 1234567815'})
+  await expect(page.locator('input[name="maker"]')).toHaveAttribute('aria-invalid','false')
 })
 
 test('품목의 선택 연도를 계산하고 연도별 제출자료 다운로드', async ({page, request}) => {

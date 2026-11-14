@@ -648,6 +648,8 @@ def create_app(path=None):
             return download(target.read_bytes(), "공동정산 수출실적 관리_백업.db", "application/octet-stream")
 
     def final_blocker(conn, org, run, annual=False):
+        if run.get("rule") != rules.VERSION:
+            return "계산 규칙이 변경되었습니다. 다시 계산하세요."
         if not run["ready"] or (not annual and not run["accepted_lines"]):
             return "검증을 완료하고 인정 대상 품목란을 확인하세요."
         table = store.policies

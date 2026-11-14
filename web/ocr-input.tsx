@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { request } from './api'
-import type { Fields, Problem } from './grid'
+import type { Fields, Problem, Row } from './grid'
+import { ProducerSelect } from './producer-select'
 
 type Page = {page:number; method:string; text:string; warning:string; rows:Fields[]}
 type Document = {id:number; pages:Page[]; approved:boolean}
@@ -11,12 +12,12 @@ const makeRow = (page:number, values:Fields = {}):Review =>
 const states = ['원본에 없음', '회원사 아님']
 const choices:Record<string, string[]> = {
   scope:['대상','제외','미확정'], status:['유효','취소','미확정'],
-  agent_state:states, owner_state:states, maker_state:states,
+  agent_state:states, owner_state:states,
 }
 const numericFields = ['usd','kg'] as const
 
-export function OcrInput({org, fields, disabled, onSaved}: {
-  org:number; fields:Fields; disabled:boolean; onSaved:(count:number)=>Promise<void>
+export function OcrInput({org, fields, members, disabled, onSaved}: {
+  org:number; fields:Fields; members:Row[] | undefined; disabled:boolean; onSaved:(count:number)=>Promise<void>
 }) {
   const dialog = useRef<HTMLDialogElement>(null)
   const fileInput = useRef<HTMLInputElement>(null)
@@ -145,7 +146,7 @@ export function OcrInput({org, fields, disabled, onSaved}: {
 
   const verified = rows.length > 0 && rows.every(item=>item.verified_usd && item.verified_kg)
   const orderedFields = ['number','line','version','hs','usd','kg','declared','shipped','accepted',
-    ...Object.keys(fields).filter(key=>!['number','line','version','hs','usd','kg','declared','shipped','accepted','fob'].includes(key))]
+    ...Object.keys(fields).filter(key=>!['number','line','version','hs','usd','kg','declared','shipped','accepted','fob','maker_state'].includes(key))]
   return <>
     <button type="button" disabled={disabled} onClick={()=>dialog.current?.showModal()}>OCR 입력</button>
     <dialog ref={dialog} className="ocr-dialog" aria-labelledby="ocr-title"
@@ -238,13 +239,16 @@ export function OcrInput({org, fields, disabled, onSaved}: {
                 const id = `ocr-${key}`
                 const value = row.values[key] ?? ''
                 return <div key={key}>
+                  {key==='maker' && <ProducerSelect members={members} onSelect={member=>
+                    update({maker:String(member.number),maker_name:String(member.name),maker_state:''})}/>}
                   <label htmlFor={id}>{label}</label>
                   {choices[key] ? <select id={id} value={value} onChange={e=>update({[key]:e.target.value})}
                     aria-invalid={!!problems.length}>
                     <option value="">{key.endsWith('_state')?'회원 명부 대조':'선택'}</option>
                     {choices[key].map(option=><option key={option}>{option}</option>)}
                   </select> : <input id={id} value={value} aria-invalid={!!problems.length}
-                    onChange={e=>update(key==='usd'?{usd:e.target.value,fob:e.target.value}:{[key]:e.target.value})}/>}
+                    onChange={e=>update(key==='usd'?{usd:e.target.value,fob:e.target.value}:
+                      key==='maker'||key==='maker_name'?{[key]:e.target.value,maker_state:''}:{[key]:e.target.value})}/>}
                   {numericFields.map(field=>field===key && <label className="ocr-confirm" key={field}>
                     <input type="checkbox" checked={!!row[`verified_${field}`]} disabled={!value.trim()}
                       onChange={event=>{
