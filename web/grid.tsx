@@ -12,6 +12,7 @@ import { PdfView, type PdfSource } from './pdf-view'
 ModuleRegistry.registerModules([AllCommunityModule])
 const theme = themeQuartz.withParams({accentColor:'#222', fontFamily:'inherit', fontSize:12,
   headerBackgroundColor:'#ededed', borderColor:'#d5d5d5', spacing:5, wrapperBorderRadius:0})
+const memberTheme = theme.withParams({backgroundColor:'#fff', oddRowBackgroundColor:'#fff', rowHoverColor:'transparent'})
 
 export type Fields = Record<string, string>
 export type Row = {id?: number; revision?: number; source?: number | null; pdf?: PdfSource | null; [key: string]: unknown}
@@ -267,11 +268,11 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
     {!!issueRows.length && <details className="compact"><summary>일괄 입력 검증 · {issueRows.length}행</summary>
       {issueRows.slice(0,200).map(row => <p key={row.row}>{row.row}행 <HelpTip text={row.issues.map(p=>p.message).join(' / ')}/></p>)}
     </details>}
-    <div className="ledger-split"><div className="grid-shell ledger-grid"><AgGridReact<Row> theme={theme} onGridReady={event => {grid.current=event.api}}
+    <div className="ledger-split"><div className="grid-shell ledger-grid"><AgGridReact<Row> theme={kind==='members' ? memberTheme : theme} onGridReady={event => {grid.current=event.api}}
       rowData={visibleRows} columnDefs={columns} quickFilterText={search} loading={query.isLoading || (problemOnly && checks.isLoading)}
       tooltipShowDelay={0} tooltipHideDelay={0}
       getRowId={p => String(p.data.id)} defaultColDef={{sortable:true,resizable:true,filter:false,suppressHeaderMenuButton:true,suppressHeaderFilterButton:true}} onRowClicked={e => {if (!busy) select(e.data)}}
-      rowClassRules={{'selected-ledger-row':p=>!!draft.id&&p.data?.id===draft.id}}
+      rowClassRules={{'selected-ledger-row':p=>kind==='lines'&&!!draft.id&&p.data?.id===draft.id}}
       onCellKeyDown={e => {if (!busy && (e.event as KeyboardEvent)?.key === 'Enter') select(e.data)}}
       overlayNoRowsTemplate="등록된 자료가 없습니다."/></div>
     {selected && <form ref={form} className="ledger-editor" onSubmit={e => {e.preventDefault(); void action(save)}}>
