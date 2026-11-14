@@ -49,7 +49,7 @@ export function ledgerHelp(key:string, kind:'lines'|'members') {
   const role = key.startsWith('agent')?'수출대행자':key.startsWith('owner')?'수출화주':'제조자'
   if (['agent','owner','maker'].some(value=>key.startsWith(value))) {
     if (key.endsWith('_name')) return `신고필증에 기재된 ${role}의 업체명입니다. 회원사명 또는 등록 별칭과 대조합니다.`
-    if (key.endsWith('_state')) return `${role}의 확인 상태입니다. 원본에 정보가 없거나 비회원으로 확인한 경우 해당 상태를 선택합니다.`
+    if (key.endsWith('_state')) return `${role}의 확인 상태입니다. 원본에 정보가 없으면 ‘원본에 없음’을, 비회원 업체는 업체명과 사업자번호를 입력한 뒤 ‘회원사 아님’을 선택합니다.`
     return `신고필증에 기재된 ${role}의 사업자번호입니다. 회원사 식별과 실적 귀속에 사용합니다.`
   }
   return fieldHelp[key]

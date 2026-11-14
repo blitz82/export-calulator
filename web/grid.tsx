@@ -304,11 +304,12 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
           const number=normalizeNumber(draft[role])
           const roleName=String(draft[role+'_name']??'').trim()
           const member=roleField&&members.data?.find(row=>normalizeNumber(row.number)===number)
-          const state=String(draft[stateKey]??'')
+          const savedState=String(draft[stateKey]??'')
+          const state=savedState==='비회원 확인'?'회원사 아님':savedState
           const matches=member&&!!normalizeCompany(roleName)&&
             memberNames(member).includes(normalizeCompany(roleName))
           const stateOptions=!number&&!roleName?['원본에 없음']:
-            members.isSuccess&&!member&&/^\d{10}$/.test(number)&&roleName?['비회원 확인']:[]
+            members.isSuccess&&!member&&/^\d{10}$/.test(number)&&roleName?['회원사 아님']:[]
           const choices=key===stateKey&&roleField
             ? [...new Set([...stateOptions,...(state&&state!=='회원 대조'?[state]:[])])]
             : options[key]
@@ -326,6 +327,7 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
             .sort((a,b)=>a.rank-b.rank)
             .slice(0,5) : []
           const inputId=`ledger-${kind}-${key}`
+          const value=roleField&&key===stateKey?state:String(draft[key]??'')
           if (roleField&&key===stateKey&&!choices?.length) {
             const hasIssue=issues.some(p=>p.severity!=='INFO'&&[role,role+'_name',stateKey].includes(p.field))
             return matches&&!hasIssue
@@ -335,7 +337,7 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
           return <div className="field-entry" key={key}><div className="field-caption"><label htmlFor={inputId}>{label}{kind==='lines'&&extraLineFields.has(key)?' (선택)':''}</label>
             <HelpTip text={ledgerHelp(key,kind)??label}/></div>
             <div className="error-anchor">
-            {choices ? <select id={inputId} name={key} aria-describedby={problems.length?`${inputId}-error`:undefined} aria-invalid={!!problems.length} value={choices.includes(String(draft[key]??''))?String(draft[key]):''} onChange={e => change(e.target.value)}>
+            {choices ? <select id={inputId} name={key} aria-describedby={problems.length?`${inputId}-error`:undefined} aria-invalid={!!problems.length} value={choices.includes(value)?value:''} onChange={e => change(e.target.value)}>
               <option value="">선택</option>{choices.map(item => <option key={item}>{item}</option>)}
             </select> : <input id={inputId} name={key} title={kind==='lines'&&(key==='declared'||key==='shipped')?dateInputHelp:undefined} aria-describedby={problems.length?`${inputId}-error`:undefined} value={String(draft[key] ?? '')}
               onChange={e => change(e.target.value)} aria-invalid={!!problems.length}/>}

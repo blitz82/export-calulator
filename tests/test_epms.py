@@ -30,13 +30,14 @@ def line(roles="ABC", **overrides):
                hs="0806.10.0000", scope="대상", status="유효")
     for role, company in zip(rules.ROLES, roles):
         row.update({role:NUMBERS[company],role+"_name":company,
-                    role+"_state":"비회원 확인" if company=="X" else "회원 대조"})
+                    role+"_state":"회원사 아님" if company=="X" else "회원 대조"})
     return row | overrides
 
 
 @pytest.mark.parametrize(("roles", "expected"), [
     ("AAA", {"A":"직접"}), ("ABA", {"A":"직접","B":"직접"}),
     ("ABC", {"A":"직접","B":"직접","C":"간접"}), ("XBC", {"B":"직접","C":"간접"}),
+    ("AXC", {"A":"직접","C":"간접"}), ("ABX", {"A":"직접","B":"직접"}),
     ("XXC", {"C":"간접"}), ("AAB", {"A":"직접","B":"간접"}),
     ("ABB", {"A":"직접","B":"직접"}), ("XXX", {}),
 ])
@@ -45,6 +46,24 @@ def test_roles(roles, expected):
     assert result["ready"]
     assert {r["name"]:r["kind"] for r in result["ledger"]} == expected
     assert all(r["usd"] == "10000" and r["kg"] == "2.01" for r in result["ledger"])
+    assert result["actual_usd"] == "10000" and result["actual_kg"] == "2.01"
+    if "X" in roles:
+        decision = next(r for r in result["decisions"] if r["number"] == NUMBERS["X"])
+        assert decision["roles"] == [role for role, company in zip(rules.ROLES, roles) if company == "X"]
+        assert decision["usd"] == decision["kg"] == "0"
+        assert not decision["direct"] and not decision["indirect"]
+
+
+def test_legacy_non_member_state_matches_new_state():
+    result = rules.calculate([line("XBC"), line("XBC", id=2, agent_state="비회원 확인")], MEMBERS, POLICY)
+    assert result["ready"] and result["accepted_lines"] == 1
+    assert {r["name"] for r in result["ledger"]} == {"B", "C"}
+
+
+def test_member_cannot_be_marked_non_member():
+    result = rules.calculate([line(agent_state="회원사 아님")], MEMBERS, POLICY)
+    assert "D045" in {p["code"] for p in result["checks"]}
+    assert not result["ready"] and not result["ledger"]
 
 
 def test_dedup_and_distinct_lines():
@@ -74,8 +93,6 @@ def test_cutoff_and_missing_evidence():
 @pytest.mark.filterwarnings("ignore:Cell .* is marked as a date")
 def test_sample_profiles():
     paths = sorted(SAMPLES.glob("(*.xlsx"))
-    if not paths:
-        pytest.skip("Local historical workbooks are required for this regression test.")
     counts = [len(books.read_rows(path.read_bytes(), books.LINE)[2]) for path in paths]
     assert counts == [314, 264, 1384, 561, 473, 42, 1170, 3402, 3670]
 

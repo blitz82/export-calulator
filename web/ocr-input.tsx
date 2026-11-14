@@ -8,7 +8,7 @@ type Review = {page:number; values:Fields; verified_usd:string; verified_kg:stri
 type ReviewIssue = Problem & {position:number}
 const makeRow = (page:number, values:Fields = {}):Review =>
   ({page, values:{version:'1', ...values}, verified_usd:'', verified_kg:''})
-const states = ['원본에 없음', '비회원 확인']
+const states = ['원본에 없음', '회원사 아님']
 const choices:Record<string, string[]> = {
   scope:['대상','제외','미확정'], status:['유효','취소','미확정'],
   agent_state:states, owner_state:states, maker_state:states,

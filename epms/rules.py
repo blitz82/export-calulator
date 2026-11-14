@@ -7,6 +7,8 @@ from decimal import Decimal, InvalidOperation
 
 VERSION = "EPMS-1.1"
 ROLES = ("agent", "owner", "maker")
+NON_MEMBER = "회원사 아님"
+NON_MEMBER_STATES = {NON_MEMBER, "비회원 확인"}
 
 
 def clean(value):
@@ -153,9 +155,9 @@ def validate_line(row, members, policy=None):
             known = [member["name"], *clean(member.get("aliases")).split("|")]
             if not name or name not in {company_name(x) for x in known if clean(x)}:
                 issues.append(issue("D044", role + "_name", "사업자번호와 회원사명 또는 별칭을 대조하세요."))
-            if state == "비회원 확인":
+            if state in NON_MEMBER_STATES:
                 issues.append(issue("D045", role + "_state", "회원사 명부에 존재하는 사업자입니다."))
-        elif state != "비회원 확인" or not name:
+        elif state not in NON_MEMBER_STATES or not name:
             issues.append(issue("D047", role + "_state", "사업자명과 회원 여부를 확인하세요."))
         parties[number].append(role)
     for roles in parties.values():
@@ -181,7 +183,7 @@ def attribute(parties, members, cutoff, usd, kg):
         indirect = active and "maker" in roles
         kind = "직접" if direct else "간접" if indirect else ""
         reason = ("직접 우선 적용" if direct and indirect else "회원사 역할 인정" if kind
-                  else "기준일 회원자격 없음" if member else "비회원 확인")
+                  else "기준일 회원자격 없음" if member else NON_MEMBER)
         results.append(dict(number=number, name=member["name"] if member else "", roles=roles,
                             direct=direct, indirect=indirect, kind=kind,
                             usd=str(usd if kind else 0), kg=None if kind and kg is None else str(kg if kind else 0),
@@ -209,6 +211,8 @@ def line_fingerprint(row):
             value = business_number(value)
         elif key in {role + "_name" for role in ROLES}:
             value = company_name(value)
+        elif key in {role + "_state" for role in ROLES} and value in NON_MEMBER_STATES:
+            value = NON_MEMBER
         elif key == "hs":
             value = re.sub(r"[.\s-]", "", value)
         values[key] = value

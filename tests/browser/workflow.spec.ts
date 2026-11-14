@@ -34,11 +34,10 @@ test('새 품목에서 회원사와 신고를 입력하고 제출용 Excel 확�
   await expect(page.locator('input[name="line"], input[name="version"]')).toHaveCount(0)
   for (const [field,value] of Object.entries({
     number:'12345-26-654321',shipped:'2026-01-02',usd:'2500',hs:'0806100000',
-    agent:'1234567834',agent_name:'포도 협동조합',
+    agent:'1234567834',agent_name:'포도 협동조합',owner:'1234567829',owner_name:'미가입 수출업체',
   })) await page.locator(`input[name="${field}"]`).fill(value)
-  for (const role of ['owner','maker']) {
-    await page.locator(`select[name="${role}_state"]`).selectOption('원본에 없음')
-  }
+  await page.locator('select[name="owner_state"]').selectOption('회원사 아님')
+  await page.locator('select[name="maker_state"]').selectOption('원본에 없음')
   await page.getByRole('button',{name:'저장',exact:true}).click()
   await expect(page.getByRole('status')).toContainText('저장됨')
   expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(820)
@@ -81,6 +80,7 @@ test('새 품목에서 회원사와 신고를 입력하고 제출용 Excel 확�
   await nav.getByRole('link',{name:'회원사별 실적 확인'}).click()
   const member=page.getByRole('row').filter({hasText:'포도 협동조합'})
   await expect(member).toContainText('2,500')
+  await expect(page.getByRole('row').filter({hasText:'미가입 수출업체'})).toHaveCount(0)
   await member.getByRole('button',{name:'보기'}).click()
   await expect(page.getByRole('cell',{name:'1234526654321'})).toBeVisible()
   await page.getByRole('main').getByRole('link',{name:'제출자료 준비'}).click()
@@ -114,9 +114,12 @@ test('역할은 명부 자동 대조 후 예외만 확인', async ({page, reques
   await expect(page.locator('input[name="agent"]')).toHaveValue('1234567815')
   await expect(page.getByText('수출대행자 · 회원사 명부 자동 대조 완료')).toBeVisible()
   await expect(page.locator('select[name="agent_state"]')).toHaveCount(0)
-  await page.locator('input[name="agent"]').fill('1234567829')
-  await expect(page.locator('select[name="agent_state"] option',{hasText:'비회원 확인'})).toHaveCount(1)
-  await page.locator('select[name="agent_state"]').selectOption('비회원 확인')
+  for (const role of ['agent','owner','maker']) {
+    await page.locator(`input[name="${role}_name"]`).fill('미가입 수출업체')
+    await page.locator(`input[name="${role}"]`).fill('1234567829')
+    await page.locator(`select[name="${role}_state"]`).selectOption('회원사 아님')
+  }
+  await page.locator('input[name="agent_name"]').fill('등록 업체')
   await page.locator('input[name="agent"]').fill('1234567815')
   await expect(page.locator('select[name="agent_state"]')).toHaveCount(0)
 })
