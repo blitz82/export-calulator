@@ -53,6 +53,30 @@ def test_roles(roles, expected):
         assert not decision["direct"] and not decision["indirect"]
 
 
+@pytest.mark.parametrize(("roles", "omitted", "member"), [
+    ("XBC", "agent", "B"),
+    ("AXC", "owner", "A"),
+])
+def test_non_member_number_optional_with_confirmed_exporter(roles, omitted, member):
+    result = rules.calculate([line(roles, **{omitted: ""})], MEMBERS, POLICY)
+    assert result["ready"] and result["accepted_lines"] == 1
+    assert {r["name"]: r["kind"] for r in result["ledger"]} == {member:"직접", "C":"간접"}
+
+
+@pytest.mark.parametrize("row", [
+    line("XXC", agent=""),
+    line("XXC", agent="", owner=""),
+    line("AXC", agent_name="불일치", owner=""),
+    line("AXC", owner="", owner_state=""),
+    line("AXC", owner="123"),
+    line("AXC", owner="", owner_name=""),
+    line("AXC", owner="", maker="", maker_name=""),
+])
+def test_number_omission_does_not_bypass_validation(row):
+    result = rules.calculate([row], MEMBERS, POLICY)
+    assert not result["ready"] and result["accepted_lines"] == 0 and not result["ledger"]
+
+
 def test_legacy_non_member_state_matches_new_state():
     result = rules.calculate([line("XBC"), line("XBC", id=2, agent_state="비회원 확인")], MEMBERS, POLICY)
     assert result["ready"] and result["accepted_lines"] == 1

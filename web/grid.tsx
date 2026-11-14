@@ -310,8 +310,15 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
           const state=savedState==='비회원 확인'?'회원사 아님':savedState
           const matches=member&&!!normalizeCompany(roleName)&&
             memberNames(member).includes(normalizeCompany(roleName))
+          const otherRole=role==='agent'?'owner':'agent'
+          const otherNumber=normalizeNumber(draft[otherRole])
+          const otherName=normalizeCompany(draft[otherRole+'_name'])
+          const otherState=String(draft[otherRole+'_state']??'')
+          const canOmitNumber=roleField&&role!=='maker'&&!number&&!!otherName&&
+            !['회원사 아님','비회원 확인','원본에 없음'].includes(otherState)&&
+            members.data?.some(row=>normalizeNumber(row.number)===otherNumber&&memberNames(row).includes(otherName))
           const stateOptions=!number&&!roleName?['원본에 없음']:
-            members.isSuccess&&!member&&/^\d{10}$/.test(number)&&roleName?['회원사 아님']:[]
+            members.isSuccess&&!member&&roleName&&(/^\d{10}$/.test(number)||canOmitNumber)?['회원사 아님']:[]
           const choices=key===stateKey&&roleField
             ? [...new Set([...stateOptions,...(state&&state!=='회원 대조'?[state]:[])])]
             : options[key]

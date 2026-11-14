@@ -34,9 +34,10 @@ test('새 품목에서 회원사와 신고를 입력하고 제출용 Excel 확�
   await expect(page.locator('input[name="line"], input[name="version"]')).toHaveCount(0)
   for (const [field,value] of Object.entries({
     number:'12345-26-654321',shipped:'2026-01-02',usd:'2500',hs:'0806100000',
-    agent:'1234567834',agent_name:'포도 협동조합',owner:'1234567829',owner_name:'미가입 수출업체',
+    agent:'1234567834',agent_name:'포도 협동조합',owner_name:'미가입 수출업체',
   })) await page.locator(`input[name="${field}"]`).fill(value)
   await page.locator('select[name="owner_state"]').selectOption('회원사 아님')
+  await expect(page.locator('input[name="owner"]')).toHaveValue('')
   await page.getByLabel('생산자 회원사 선택').selectOption({label:'포도 협동조합 · 1234567834'})
   await expect(page.locator('input[name="maker"]')).toHaveValue('1234567834')
   await page.getByRole('button',{name:'저장',exact:true}).click()

@@ -141,6 +141,8 @@ def validate_line(row, members, policy=None):
         issues.append(issue("D010", "status", "신고 유효 상태를 확인하세요.",
                             "INFO" if status == "취소" else "ERROR"))
     parties = defaultdict(list)
+    confirmed_exporter = False
+    non_members_without_number = []
     for role in ROLES:
         name = company_name(row.get(role + "_name"))
         number = business_number(row.get(role))
@@ -156,18 +158,28 @@ def validate_line(row, members, policy=None):
                 continue
         if state == "원본에 없음" and not number and not name:
             continue
+        if role in ("agent", "owner") and not number and name and state in NON_MEMBER_STATES:
+            non_members_without_number.append(role)
+            continue
         if not valid_number(number):
             issues.append(issue("D043" if number else "D047", role, "역할의 사업자번호 또는 원본의 정보부재를 확인하세요."))
             continue
         if member:
             known = [member["name"], *clean(member.get("aliases")).split("|")]
-            if not name or name not in {company_name(x) for x in known if clean(x)}:
+            name_matches = bool(name and name in {company_name(x) for x in known if clean(x)})
+            if not name_matches:
                 issues.append(issue("D044", role + "_name", "사업자번호와 회원사명 또는 별칭을 대조하세요."))
             if state in NON_MEMBER_STATES:
                 issues.append(issue("D045", role + "_state", "회원사 명부에 존재하는 사업자입니다."))
+            elif (role in ("agent", "owner") and state != "원본에 없음"
+                  and name_matches):
+                confirmed_exporter = True
         elif state not in NON_MEMBER_STATES or not name:
             issues.append(issue("D047", role + "_state", "사업자명과 회원 여부를 확인하세요."))
         parties[number].append(role)
+    if not confirmed_exporter:
+        for role in non_members_without_number:
+            issues.append(issue("D047", role, "수출대행자와 수출화주 중 한 곳이 회원사로 확인되어야 비회원의 사업자번호를 생략할 수 있습니다."))
     for roles in parties.values():
         if len(roles) > 1:
             issues.append(issue("D085" if "maker" in roles else "D084", roles[0],
