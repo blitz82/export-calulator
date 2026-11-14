@@ -1,0 +1,187 @@
+import { expect, test } from '@playwright/test'
+
+test.describe.configure({mode:'serial'})
+
+async function office(request: import('@playwright/test').APIRequestContext, headers: Record<string,string>) {
+  const state=await (await request.get('/api/office',{headers})).json()
+  if (state.item) return state.item
+  return (await request.post('/api/organizations',{headers,params:{name:'시험 품목'}})).json()
+}
+
+test('새 품목에서 회원사와 신고를 입력하고 제출용 Excel 확정', async ({page}) => {
+  await page.setViewportSize({width:820,height:570})
+  await page.goto('/')
+  const nav=page.getByRole('navigation',{name:'업무 메뉴'})
+  await expect(page.getByRole('heading',{name:'품목 등록',exact:true})).toBeVisible()
+  await page.getByRole('textbox',{name:'품목명'}).fill('시험 포도')
+  await page.getByRole('button',{name:'품목 등록',exact:true}).click()
+  await page.getByRole('link',{name:'회원사 등록하기'}).click()
+  await expect(nav.getByRole('link',{name:'프로그램 설정'})).toBeHidden()
+  await page.getByRole('button',{name:'회원사 추가'}).press('Enter')
+  await page.locator('input[name="name"]').fill('포도 협동조합')
+  await page.locator('input[name="number"]').fill('1234567834')
+  await page.getByRole('combobox',{name:'회원사 유형'}).selectOption('생산자')
+  await page.locator('input[name="approved"]').fill('2024-01-01')
+  await page.getByRole('button',{name:'저장',exact:true}).press('Enter')
+  await expect(page.getByRole('status')).toContainText('저장됨')
+
+  await nav.getByRole('link',{name:'업무 홈'}).click()
+  await page.getByRole('link',{name:'신고필증 입력하기'}).click()
+  await page.getByRole('button',{name:'신고필증 추가'}).click()
+  for (const [field,value] of Object.entries({
+    number:'12345-26-654321',shipped:'2026-01-02',usd:'2500',hs:'0806100000',
+    agent:'1234567834',agent_name:'포도 협동조합',
+  })) await page.locator(`input[name="${field}"]`).fill(value)
+  for (const role of ['owner','maker']) {
+    await page.locator(`select[name="${role}_state"]`).selectOption('원본에 없음')
+  }
+  await page.getByRole('button',{name:'저장',exact:true}).click()
+  await expect(page.getByRole('status')).toContainText('저장됨')
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(820)
+
+  await nav.getByRole('link',{name:'업무 홈'}).click()
+  await page.getByRole('link',{name:'계산 정책 열기'}).click()
+  await expect(nav.getByRole('link',{name:'프로그램 설정'})).toHaveAttribute('aria-current','page')
+  for (const year of ['2025','2026']) {
+    await page.getByRole('spinbutton',{name:/실적 연도/}).fill(year)
+    await page.getByLabel(/회원자격 기준일/).fill(year+'-12-31')
+    await page.getByRole('combobox',{name:/귀속연도 기준/}).selectOption('shipped')
+    await page.getByRole('textbox',{name:'대상 HS코드'}).fill('0806100000')
+    await page.getByRole('button',{name:'정책 저장'}).click()
+    await expect(page.getByRole('status')).toHaveText('계산 정책을 저장했습니다.')
+  }
+  await nav.getByRole('link',{name:'수출실적 계산'}).click()
+  await page.getByRole('spinbutton',{name:'실적 연도'}).fill('2026')
+  await page.getByRole('button',{name:'수출실적 계산'}).click()
+  await expect(page.getByText('계산 검증 통과',{exact:true})).toBeVisible()
+  await nav.getByRole('link',{name:'회원사별 실적 확인'}).click()
+  const member=page.getByRole('row').filter({hasText:'포도 협동조합'})
+  await expect(member).toContainText('2,500')
+  await member.getByRole('button',{name:'보기'}).click()
+  await expect(page.getByRole('cell',{name:'1234526654321'})).toBeVisible()
+  await page.getByRole('main').getByRole('link',{name:'제출자료 준비'}).click()
+  await page.getByRole('button',{name:'두 연도 계산'}).click()
+  await expect(page.getByText(/확정 가능/)).toBeVisible()
+  page.once('dialog',dialog=>dialog.accept())
+  const result=page.waitForEvent('download')
+  await page.getByRole('button',{name:'최종 확정 후 제출용 Excel 다운로드'}).click()
+  expect((await result).suggestedFilename()).toMatch(/2026년_최종확정본\.xlsx/)
+
+  const {token}=await (await page.request.get('/api/session')).json()
+  const headers={'x-epms-token':token}
+  const org=await office(page.request,headers)
+  const [run]=await (await page.request.get(`/api/org/${org.id}/runs`,{headers})).json()
+  for (const [route,label] of [['audit','감사 자료'],['checks','상세 검증 이력']]) {
+    await page.goto('/#/'+route+'?run='+run.id)
+    await expect(nav.getByRole('link',{name:label})).toHaveAttribute('aria-current','page')
+    await expect(page.getByRole('combobox',{name:'계산 실행번호'})).toHaveValue(String(run.id))
+  }
+})
+
+test('역할은 명부 자동 대조 후 예외만 확인', async ({page, request}) => {
+  const token=(await (await request.get('/api/session')).json()).token
+  const headers={'x-epms-token':token}
+  const org = await office(request,headers)
+  await request.post(`/api/org/${org.id}/data/members`,{headers,data:[{values:{
+    name:'등록 업체',number:'1234567815',kind:'생산자',approved:'2024-01-01',
+  }}]})
+  await page.goto('/#/lines')
+  await page.getByRole('button',{name:'신고필증 추가'}).click()
+  await page.locator('select[name="agent_state"]').selectOption('원본에 없음')
+  await page.locator('input[name="agent_name"]').fill('등록 업채')
+  await page.getByRole('button',{name:'등록 업체 · 1234567815'}).click()
+  await expect(page.locator('input[name="agent"]')).toHaveValue('1234567815')
+  await expect(page.getByText('수출대행자 · 회원사 명부 자동 대조 완료')).toBeVisible()
+  await expect(page.locator('select[name="agent_state"]')).toHaveCount(0)
+  await page.locator('input[name="agent"]').fill('1234567829')
+  await expect(page.locator('select[name="agent_state"] option',{hasText:'비회원 확인'})).toHaveCount(1)
+  await page.locator('select[name="agent_state"]').selectOption('비회원 확인')
+  await page.locator('input[name="agent"]').fill('1234567815')
+  await expect(page.locator('select[name="agent_state"]')).toHaveCount(0)
+})
+
+test('품목의 선택 연도를 계산하고 연도별 제출자료 다운로드', async ({page, request}) => {
+  const token = (await (await request.get('/api/session')).json()).token
+  const headers = {'x-epms-token':token}
+  const org = await office(request,headers)
+  for (const year of [2030,2031]) {
+  const response=await request.put(`/api/org/${org.id}/policies/${year}`, {headers,
+    data:{cutoff:'2031-12-31',basis:'shipped',hs:['0806100000'],reason:'합성 정책'}})
+  expect(response.ok()).toBeTruthy()
+  }
+  await page.goto('/#/submission')
+  await expect(page.getByRole('combobox',{name:'실적 연도'})).toHaveValue('2031')
+  await expect(page.getByText('작성 시트',{exact:true})).toHaveCount(0)
+  await page.getByRole('button',{name:'두 연도 계산'}).click()
+  await expect(page.getByText(/회원 기준일.*2031-12-31/)).toBeVisible()
+  const result=page.waitForEvent('download')
+  await page.getByRole('button',{name:'초안 다운로드'}).click()
+  expect((await result).suggestedFilename()).toMatch(/2031년_검증미완료\.xlsx/)
+})
+
+test('대시보드에서 보완 원장을 열고 오류 항목 수정', async ({page, request}) => {
+  const token = (await (await request.get('/api/session')).json()).token
+  const headers = {'x-epms-token':token}
+  const org = await office(request,headers)
+  await request.post(`/api/org/${org.id}/data/lines`, {headers, data:[{values:{number:'12345-26-123456',line:'1',product:'합성 품목'}}]})
+  await page.goto('/')
+  await page.getByRole('link',{name:/보완 필요 원장 행/}).click()
+  await expect(page.getByRole('button',{name:'보완 필요만'})).toHaveAttribute('aria-pressed','true')
+  await page.getByRole('gridcell',{name:'12345-26-123456'}).click()
+  const editor = page.locator('.ledger-editor')
+  await expect(editor).toBeVisible()
+  const amount = editor.locator('input[name="usd"]')
+  await expect(amount).toHaveAttribute('aria-invalid','true')
+  await expect(amount).toHaveAccessibleDescription('원본의 숫자와 단위를 확인하세요.')
+  await amount.fill('2500')
+  await expect(amount).toHaveAttribute('aria-invalid','false')
+  await editor.getByRole('button',{name:'저장',exact:true}).click()
+  await expect(page.getByRole('status')).toContainText('저장됨')
+  await expect(editor.locator('input[name="kg"]')).toHaveCount(0)
+  await editor.getByRole('button',{name:'선택 참고 항목 펼치기'}).click()
+  await expect(editor.locator('input[name="kg"]')).toBeVisible()
+  await page.getByRole('button',{name:'전체 삭제',exact:true}).click()
+  const dialog=page.getByRole('dialog')
+  await dialog.getByRole('textbox',{name:'리셋 확인 문구'}).fill('모두리셋 ')
+  await expect(dialog.getByRole('button',{name:'모든 행 비우기'})).toBeDisabled()
+  await dialog.getByRole('textbox',{name:'리셋 확인 문구'}).fill('모두리셋')
+  await dialog.getByRole('button',{name:'모든 행 비우기'}).click()
+  await expect(page.getByRole('gridcell',{name:'12345-26-123456'})).toHaveCount(0)
+  await expect(page.getByRole('status')).toContainText(/원장 \d+행을 비웠습니다/)
+})
+
+test('통합조직 설정과 회원사 검증 및 다운로드', async ({page}) => {
+  await page.goto('/')
+  await page.getByText('설정·관리',{exact:true}).click()
+  await page.getByRole('navigation').getByRole('link',{name:'프로그램 설정'}).click()
+  await page.getByRole('textbox',{name:'품목명'}).fill('브라우저 검증 ' + Date.now())
+  await page.getByRole('button',{name:'품목명 저장',exact:true}).click()
+  await expect(page.locator('header strong')).toHaveText(/브라우저 검증/)
+  const policyTip=page.locator('label').filter({hasText:'확정 근거'}).getByLabel('도움말')
+  await policyTip.hover()
+  await expect(page.getByRole('tooltip',{name:/내부 승인 기록/})).toBeVisible()
+  await page.getByRole('heading',{name:'프로그램 설정',exact:true}).hover()
+  await expect(page.getByRole('tooltip',{name:/내부 승인 기록/})).toHaveCount(0)
+  await page.getByRole('navigation').getByRole('link',{name:'회원사 등록·수정'}).click()
+  await expect(page.getByText('열 표시',{exact:true})).toBeVisible()
+  await expect(page.getByText(/가져오기 매핑/)).toHaveCount(0)
+  await page.getByRole('button',{name:'회원사 추가'}).click()
+  await page.getByRole('textbox',{name:'회원사명',exact:true}).fill('합성 회원사')
+  await page.locator('input[name="number"]').fill('123')
+  await expect(page.locator('input[name="number"]')).toHaveAttribute('aria-invalid','true')
+  await page.locator('input[name="number"]').fill('1234567829')
+  await page.getByRole('combobox',{name:'회원사 유형'}).selectOption('생산자')
+  await page.locator('input[name="approved"]').fill('2024-01-01')
+  await page.getByRole('button',{name:'저장',exact:true}).click()
+  await expect(page.getByRole('status')).toContainText('저장됨')
+  await page.getByRole('button',{name:'회원사 추가'}).click()
+  await page.locator('input[name="number"]').fill('1234567829')
+  const number=page.locator('input[name="number"]')
+  await expect(number).toHaveAttribute('aria-invalid','true')
+  await expect(number).toHaveAccessibleDescription('이 통합조직에 이미 등록된 사업자번호입니다.')
+  await expect(page.getByText(/M005/)).toHaveCount(0)
+  const result = page.waitForEvent('download')
+  await page.getByText('Excel 가져오기·내보내기',{exact:true}).click()
+  await page.getByRole('button',{name:'Excel 다운로드'}).click()
+  expect((await result).suggestedFilename()).toMatch(/회원사명부_.*\.xlsx/)
+})

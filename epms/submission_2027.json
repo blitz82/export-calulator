@@ -1,0 +1,12 @@
+{
+  "version": "2027-1",
+  "cutoff": "2026-12-31",
+  "sheets": ["코파(파프리카)", "11개품목 동일하게 추가"],
+  "first_row": 7,
+  "last_row": 20,
+  "member_columns": {
+    "serial": "B", "applied": "C", "approved": "D", "name": "E", "number": "F",
+    "address": "G", "representative": "H", "contact": "I", "phone": "J", "email": "K"
+  },
+  "amount_columns": {"2025": ["L", "M", "N"], "2026": ["O", "P", "Q"]}
+}

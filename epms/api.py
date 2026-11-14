@@ -1,0 +1,600 @@
+import json
+import os
+import secrets
+from io import BytesIO
+from pathlib import Path
+from urllib.parse import quote
+from zipfile import BadZipFile, ZipFile
+
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Request, Response
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
+from openpyxl.utils.exceptions import InvalidFileException
+from pydantic import BaseModel, Field
+from sqlalchemy import select
+from sqlalchemy.dialects.sqlite import insert
+from sqlalchemy.exc import IntegrityError
+
+from epms import books, rules, store, submission
+
+ROOT = Path(__file__).resolve().parents[1]
+FIELDS = {"members": books.MEMBER, "lines": books.LINE}
+TABLES = {"members": store.memberships, "lines": store.declarations}
+SUMMARY = dict(number="사업자번호", name="회원사명", direct_usd="직접수출 USD", indirect_usd="간접수출 USD",
+               total_usd="합계 USD", direct_kg="직접수출 kg", indirect_kg="간접수출 kg", lines="인정 품목란 수")
+LEDGER = dict(number_declared="신고번호", line="품목란", version="정정 버전", number="사업자번호", name="회원사명",
+              direct="직접 자격", indirect="간접 자격", kind="최종 인정", usd="USD", kg="kg", reason="판정 근거",
+              row_id="원장 ID", source_ids="관련 원장 ID")
+CHECKS = dict(row_id="원장 ID", member_id="회원 ID", code="오류 코드", field="항목", severity="심각도", message="검증 내용")
+XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+class Edit(BaseModel):
+    values: dict[str, str] = Field(max_length=50)
+    id: int | None = None
+    revision: int | None = None
+    reason: str = Field(default="화면 입력", min_length=1, max_length=500)
+
+
+class Policy(BaseModel):
+    cutoff: str
+    basis: str
+    hs: list[str] = Field(min_length=1, max_length=500)
+    reason: str = Field(min_length=1, max_length=500)
+
+
+class ResetLedger(BaseModel):
+    confirmation: str
+
+
+def fail(message, status=400):
+    raise HTTPException(status, message)
+
+
+def download(data, name, media=XLSX):
+    return Response(data, media_type=media, headers={"Content-Disposition": "attachment; filename*=UTF-8''" + quote(name)})
+
+
+def create_app(path=None):
+    db = store.engine_for(path)
+    app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+    token = secrets.token_urlsafe(24)
+    app.state.token = token
+    app.state.db = db
+
+    @app.middleware("http")
+    async def local(request, call_next):
+        if request.url.hostname not in ("127.0.0.1", "localhost", "testserver"):
+            return Response(status_code=403)
+        if request.url.path.startswith("/api/") and request.url.path != "/api/session":
+            if not secrets.compare_digest(request.headers.get("x-epms-token", ""), token):
+                return JSONResponse({"detail": "프로그램 화면을 새로고침하세요."}, status_code=403)
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
+    @app.exception_handler(RequestValidationError)
+    async def invalid_request(_, exc):
+        return JSONResponse({"detail": "입력값의 형식 또는 길이를 확인하세요."}, status_code=422)
+
+    @app.exception_handler(IntegrityError)
+    async def conflict(_, exc):
+        return JSONResponse({"detail": "중복 등록 또는 참조 관계를 확인하세요."}, status_code=409)
+
+    @app.get("/api/session")
+    def session():
+        return {"token": token}
+
+    @app.post("/api/shutdown")
+    def shutdown(tasks: BackgroundTasks):
+        stop = getattr(app.state, "shutdown", None)
+        if stop is None:
+            fail("이 실행 환경에서는 화면에서 프로그램을 종료할 수 없습니다.", 409)
+        tasks.add_task(stop)
+        return {"ok": True}
+
+    @app.get("/api/fields")
+    def fields():
+        return FIELDS
+
+    def actor(request):
+        return rules.clean(request.headers.get("x-epms-actor"))[:80] or os.environ.get("USERNAME", "로컬 사용자")
+
+    def table_for(kind):
+        if kind not in TABLES:
+            fail("자료 종류를 확인하세요.", 404)
+        return TABLES[kind]
+
+    def organization(conn, org):
+        result = conn.execute(select(store.organizations.c.name).where(store.organizations.c.id == org)).scalar()
+        if result is None:
+            fail("통합조직을 선택하세요.", 404)
+        return result
+
+    def member_index(conn, org):
+        return {rules.business_number(m["number"]): m for m in store.records(conn, store.memberships, org)}
+
+    def validate(conn, org, kind, row):
+        index = member_index(conn, org)
+        return (rules.validate_member(row, index.values()) if kind == "members"
+                else rules.validate_line(row, index)[0])
+
+    @app.get("/api/organizations")
+    def organizations():
+        with db.connect() as conn:
+            return [dict(row) for row in conn.execute(store.organizations.select().order_by(store.organizations.c.id)).mappings()]
+
+    @app.post("/api/organizations")
+    def add_organization(name: str, request: Request):
+        name = rules.clean(name)
+        if not name or len(name) > 100:
+            fail("품목명을 100자 이내로 입력하세요.")
+        with db.begin() as conn:
+            conn.exec_driver_sql("BEGIN IMMEDIATE")
+            if conn.execute(select(store.organizations.c.id).limit(1)).first():
+                fail("이미 품목이 등록되어 있습니다. 프로그램 설정에서 품목명을 수정하세요.", 409)
+            result = conn.execute(store.organizations.insert().values(name=name))
+            org = result.inserted_primary_key[0]
+            conn.execute(store.office.insert().values(id=1, org=org))
+            store.log(conn, org, actor(request), "통합조직", org, "신규 등록", None, {"name": name})
+        return {"id": org, "name": name}
+
+    @app.get("/api/office")
+    def get_office():
+        with db.connect() as conn:
+            active = conn.execute(select(store.office.c.org).where(store.office.c.id == 1)).scalar()
+            rows = [dict(row) for row in conn.execute(store.organizations.select().order_by(store.organizations.c.id)).mappings()]
+        return {"item": next((row for row in rows if row["id"] == active), rows[0] if len(rows) == 1 else None),
+                "choices": rows if active is None and len(rows) > 1 else []}
+
+    @app.put("/api/office/{org}")
+    def update_office(org: int, request: Request, name: str | None = None):
+        with db.begin() as conn:
+            conn.exec_driver_sql("BEGIN IMMEDIATE")
+            old = organization(conn, org)
+            active = conn.execute(select(store.office.c.org).where(store.office.c.id == 1)).scalar()
+            if active is not None and active != org:
+                fail("사용 중인 품목만 수정할 수 있습니다.", 409)
+            if name is None:
+                name = old
+            else:
+                name = rules.clean(name)
+                if not name or len(name) > 100:
+                    fail("품목명을 100자 이내로 입력하세요.")
+            if name != old:
+                conn.execute(store.organizations.update().where(store.organizations.c.id == org).values(name=name))
+            if active is None:
+                conn.execute(store.office.insert().values(id=1, org=org))
+            if active is None or name != old:
+                store.log(conn, org, actor(request), "통합조직", org,
+                          "사용 품목 지정" if active is None else "품목명 수정", {"name": old}, {"name": name})
+        return {"id": org, "name": name}
+
+    @app.get("/api/org/{org}/data/{kind}")
+    def list_rows(org: int, kind: str):
+        table = table_for(kind)
+        with db.connect() as conn:
+            organization(conn, org)
+            return store.records(conn, table, org)
+
+    @app.post("/api/org/{org}/data/{kind}/validate")
+    def preview(org: int, kind: str, edit: Edit):
+        table_for(kind)
+        with db.connect() as conn:
+            organization(conn, org)
+            return validate(conn, org, kind, dict(edit.values, id=edit.id))
+
+    @app.get("/api/org/{org}/line-checks")
+    def line_checks(org: int):
+        with db.connect() as conn:
+            organization(conn, org)
+            index = member_index(conn, org)
+            rows = store.records(conn, store.declarations, org)
+        return {row["id"]: problems for row in rows
+                if (problems := rules.validate_line(row, index)[0])}
+
+    def save(conn, org, kind, edit, user, source=None, index=None):
+        table = table_for(kind)
+        values = {key: rules.clean(value) for key, value in edit.values.items() if key in FIELDS[kind]}
+        if any(len(v) > 4000 for v in values.values()):
+            fail("셀 입력값은 4,000자 이하여야 합니다.")
+        old = None
+        if edit.id is not None:
+            old = conn.execute(table.select().where(table.c.org == org, table.c.id == edit.id)).first()
+            if old is None or (kind == "lines" and old.deleted):
+                fail("자료를 찾을 수 없습니다.", 404)
+            if old.revision != edit.revision:
+                fail("다른 화면에서 변경했습니다. 새로고침하세요.", 409)
+        row = dict(values, id=edit.id)
+        if index is None:
+            index = member_index(conn, org)
+        issues = (rules.validate_member(row, index.values()) if kind == "members"
+                  else rules.validate_line(row, index)[0])
+        if kind == "members" and any(p["severity"] == "ERROR" for p in issues):
+            return {"issues": issues}
+        revision = (old.revision if old else 0) + 1
+        record = dict(org=org, revision=revision, data=values)
+        if kind == "members":
+            number = rules.business_number(values["number"])
+            if old and number != old.number:
+                fail("기존 회원의 사업자번호 정정은 관리자 확인이 필요합니다.")
+            conn.execute(insert(store.companies).values(number=number).on_conflict_do_nothing())
+            record["number"] = number
+        elif not old:
+            record["source"] = source
+        if old:
+            changed = conn.execute(table.update().where(table.c.id == edit.id,
+                                   table.c.revision == old.revision).values(**record))
+            if changed.rowcount != 1:
+                fail("다른 화면에서 변경했습니다. 새로고침하세요.", 409)
+            row_id = edit.id
+        else:
+            row_id = conn.execute(table.insert().values(**record)).inserted_primary_key[0]
+        row = dict(values, id=row_id, revision=revision)
+        if kind == "lines":
+            row["source"] = old.source if old else source
+        else:
+            index[number] = row
+        store.log(conn, org, user, kind, row_id, edit.reason, old.data if old else None, row)
+        return {"row": row, "issues": issues}
+
+    @app.post("/api/org/{org}/data/{kind}")
+    def save_rows(org: int, kind: str, edits: list[Edit], request: Request):
+        if not 1 <= len(edits) <= 1000:
+            fail("한 번에 1,000행까지 저장할 수 있습니다.")
+        with db.begin() as conn:
+            organization(conn, org)
+            index = member_index(conn, org)
+            return [save(conn, org, kind, edit, actor(request), index=index) for edit in edits]
+
+    @app.delete("/api/org/{org}/data/lines/{row_id}")
+    def delete_line(org: int, row_id: int, revision: int, reason: str, request: Request):
+        if not rules.clean(reason):
+            fail("삭제 사유를 입력하세요.")
+        with db.begin() as conn:
+            table = store.declarations
+            row = conn.execute(table.select().where(table.c.id == row_id, table.c.org == org,
+                               table.c.revision == revision, table.c.deleted == 0)).first()
+            if row is None:
+                fail("자료를 다시 불러오세요.", 409)
+            updated = conn.execute(table.update().where(table.c.id == row_id, table.c.revision == revision)
+                                   .values(deleted=1, revision=revision + 1))
+            if updated.rowcount != 1:
+                fail("자료를 다시 불러오세요.", 409)
+            store.log(conn, org, actor(request), "lines", row_id, reason[:500], row.data, None)
+        return {"ok": True}
+
+    @app.post("/api/org/{org}/data/lines/reset")
+    def reset_lines(org: int, reset: ResetLedger, request: Request):
+        if reset.confirmation != "모두리셋":
+            fail("확인 문구를 정확히 입력하세요.")
+        table = store.declarations
+        with db.begin() as conn:
+            organization(conn, org)
+            result = conn.execute(table.update().where(table.c.org == org, table.c.deleted == 0)
+                                  .values(deleted=1, revision=table.c.revision + 1))
+            if result.rowcount:
+                store.log(conn, org, actor(request), "lines", 0, "원장 전체 초기화",
+                          {"active_count": result.rowcount}, {"active_count": 0})
+        return {"count": result.rowcount}
+
+    @app.post("/api/org/{org}/import/{kind}")
+    async def upload(org: int, kind: str, name: str, request: Request):
+        from starlette.concurrency import run_in_threadpool
+
+        table_for(kind)
+        if not name.lower().endswith(".xlsx") or any(ch in name for ch in ("/", "\\", ":")) or len(name) > 240:
+            fail("XLSX 파일명을 확인하세요.")
+        payload = bytearray()
+        async for chunk in request.stream():
+            if len(payload) + len(chunk) > 20_000_000:
+                fail("파일 크기는 20MB 이하여야 합니다.", 413)
+            payload.extend(chunk)
+        return await run_in_threadpool(import_book, org, kind, name, bytes(payload), actor(request))
+
+    def import_book(org, kind, name, data, user):
+        try:
+            sheet_name, profile, rows = books.read_rows(data, FIELDS[kind])
+        except (ValueError, BadZipFile, InvalidFileException, KeyError, OSError):
+            fail("Excel 파일 구조를 확인하거나 표준 양식을 사용하세요.")
+        sha = books.digest(data)
+        with db.begin() as conn:
+            organization(conn, org)
+            table = store.import_files
+            new = conn.execute(insert(table).values(org=org, sha=sha, kind=kind, name=name, data=data)
+                               .on_conflict_do_nothing(index_elements=["org", "sha", "kind"]))
+            if new.rowcount:
+                file_id = new.inserted_primary_key[0]
+            else:
+                file_id = conn.execute(select(table.c.id).where(table.c.org == org, table.c.sha == sha,
+                                                               table.c.kind == kind)).scalar_one()
+                lines, sources = store.declarations, store.import_rows
+                active = conn.execute(select(lines.c.id).join(sources, lines.c.source == sources.c.id)
+                                      .where(sources.c.file == file_id, lines.c.deleted == 0).limit(1)).first()
+                if kind != "lines" or active:
+                    fail("D081 같은 원본 파일을 이미 가져왔습니다.", 409)
+            index = member_index(conn, org)
+            rejected = []
+            for row_index, values in rows:
+                source = conn.execute(store.import_rows.insert().values(file=file_id, sheet=sheet_name,
+                                      row=row_index, original=values)).inserted_primary_key[0]
+                result = save(conn, org, kind, Edit(values=values, reason=f"Excel 가져오기 ({source})"), user, source, index)
+                if "row" not in result:
+                    rejected.append(dict(row=row_index, issues=result["issues"]))
+            store.log(conn, org, user, "Excel", file_id, "원본 저장", None, dict(name=name, sha=sha, rows=len(rows)))
+        return dict(imported=len(rows) - len(rejected), rejected=rejected, profile=profile)
+
+    @app.get("/api/org/{org}/export/{kind}")
+    def export_data(org: int, kind: str, template: bool = False):
+        table = table_for(kind)
+        with db.connect() as conn:
+            name = organization(conn, org)
+            rows = [] if template else store.records(conn, table, org)
+            if kind == "lines" and not template:
+                index = member_index(conn, org)
+                for row in rows:
+                    issues, _ = rules.validate_line(row, index)
+                    row["issues"] = "\n".join(p["code"] + " " + p["message"] for p in issues)
+            fields = FIELDS[kind] | ({"source": "원본 행 ID", "issues": "검증 결과"} if kind == "lines" and not template else {})
+        title = "회원사명부" if kind == "members" else "수출신고필증원장"
+        return download(books.workbook([(title, fields, rows)]), f"{title}_{name}.xlsx")
+
+    @app.get("/api/org/{org}/policies")
+    def policies(org: int):
+        with db.connect() as conn:
+            return [r.data for r in conn.execute(store.policies.select().where(store.policies.c.org == org))]
+
+    @app.put("/api/org/{org}/policies/{year}")
+    def policy(org: int, year: int, policy: Policy, request: Request):
+        import re
+
+        cutoff = rules.day(policy.cutoff)
+        hs = sorted({re.sub(r"[.\s-]", "", rules.clean(v)) for v in policy.hs})
+        if (not cutoff or not 1900 <= year <= 2100 or policy.basis not in ("shipped", "declared")
+                or any(not re.fullmatch(r"[0-9]{10}", v) for v in hs)):
+            fail("기준일, 귀속연도 기준, HS코드 10자리를 확인하세요.")
+        data = dict(year=year, cutoff=cutoff.isoformat(), basis=policy.basis, hs=hs)
+        with db.begin() as conn:
+            organization(conn, org)
+            table = store.policies
+            previous = conn.execute(select(table.c.data).where(table.c.org == org, table.c.year == year)).scalar()
+            conn.execute(insert(table).values(org=org, year=year, data=data)
+                         .on_conflict_do_update(index_elements=["org", "year"], set_={"data": data}))
+            store.log(conn, org, actor(request), "계산 정책", year, policy.reason, previous, data)
+        return data
+
+    @app.post("/api/org/{org}/runs")
+    def calculate(org: int, year: int, request: Request):
+        with db.begin() as conn:
+            name = organization(conn, org)
+            table = store.policies
+            policy = conn.execute(select(table.c.data).where(table.c.org == org, table.c.year == year)).scalar()
+            if not policy:
+                fail("설정에서 귀속연도, 회원자격 기준일, 대상 HS코드를 등록하세요.")
+            rows = store.records(conn, store.declarations, org)
+            members = store.records(conn, store.memberships, org)
+            result = rules.calculate(rows, members, policy)
+            result.update(rule=rules.VERSION, policy=policy, organization=name, rows=rows, members=members)
+            stamp = store.now()
+            run_id = conn.execute(store.runs.insert().values(org=org, year=year, time=stamp,
+                                  data=result)).inserted_primary_key[0]
+            store.log(conn, org, actor(request), "계산 실행", run_id, "계산", None, {"year": year, "rule": rules.VERSION})
+        return dict(id=run_id, time=stamp, ready=result["ready"])
+
+    @app.get("/api/org/{org}/runs")
+    def list_runs(org: int):
+        table = store.runs
+        with db.connect() as conn:
+            query = select(table.c.id, table.c.year, table.c.time).where(table.c.org == org).order_by(table.c.id.desc())
+            return [dict(r) for r in conn.execute(query).mappings()]
+
+    def get_run(conn, org, run_id):
+        table = store.runs
+        run = conn.execute(table.select().where(table.c.org == org, table.c.id == run_id)).first()
+        if run is None:
+            fail("계산 실행번호를 확인하세요.", 404)
+        return run.data
+
+    @app.get("/api/org/{org}/runs/{run_id}")
+    def run_detail(org: int, run_id: int):
+        with db.connect() as conn:
+            run = get_run(conn, org, run_id)
+            fields = ("rule", "policy", "checks", "member_issues", "actual_usd", "actual_kg", "accepted_lines", "ledger", "ready")
+            return dict({k: run[k] for k in fields}, summary=rules.summarize(run["ledger"]),
+                        attributed_usd=str(sum((rules.Decimal(row["usd"]) for row in run["ledger"]), rules.Decimal(0))))
+
+    @app.get("/api/org/{org}/audit")
+    def history(org: int, row_id: int | None = None):
+        table = store.audit
+        query = table.select().where(table.c.org == org).order_by(table.c.id.desc()).limit(500)
+        if row_id is not None:
+            query = query.where(table.c.entity == "lines", table.c.target == row_id)
+        with db.connect() as conn:
+            records = [dict(r) for r in conn.execute(query).mappings()]
+        # Display older system-generated labels with the current terminology.
+        for record in records:
+            if record["entity"] == "산정 정책":
+                record["entity"] = "계산 정책"
+            elif record["entity"] == "산정 실행":
+                record["entity"] = "계산 실행"
+                if record["reason"] == "산정":
+                    record["reason"] = "계산"
+        return records
+
+    @app.get("/api/org/{org}/runs/{run_id}/evidence/{row_id}")
+    def evidence(org: int, run_id: int, row_id: int):
+        with db.connect() as conn:
+            run = get_run(conn, org, run_id)
+            row = next((r for r in run["rows"] if r["id"] == row_id), None)
+            if not row:
+                fail("원장 자료를 찾을 수 없습니다.", 404)
+            sources, files = store.import_rows, store.import_files
+            source = conn.execute(select(sources.c.sheet, sources.c.row, sources.c.original, files.c.name, files.c.sha)
+                                  .join(files, files.c.id == sources.c.file).where(sources.c.id == row["source"])).mappings().first()
+        return dict(row=row, source=dict(source) if source else None, decisions=[r for r in run["decisions"] if r["row_id"] == row_id])
+
+    @app.get("/api/org/{org}/runs/{run_id}/report")
+    def report(org: int, run_id: int, bundle: bool = False):
+        with db.connect() as conn:
+            run = get_run(conn, org, run_id)
+            src, files = store.import_rows, store.import_files
+            ids = [row["source"] for row in run["rows"] if row["source"]]
+            hashes = [dict(item) for offset in range(0, len(ids), 500) for item in conn.execute(
+                select(src.c.id, src.c.sheet, src.c.row, files.c.name, files.c.sha).join(files, files.c.id == src.c.file)
+                .where(src.c.id.in_(ids[offset:offset + 500]))).mappings()]
+        ledger = [dict(r, source_ids=", ".join(map(str, r["source_ids"])), usd=rules.Decimal(r["usd"]),
+                       kg=rules.Decimal(r["kg"]) if r["kg"] is not None else None) for r in run["decisions"]]
+        state = "검증 통과 · 검토용" if run["ready"] else "검증 미완료"
+        sheets = [
+            ("계산 정보", dict(id="실행번호", rule="규칙", cutoff="기준일", state="상태", usd="실제 USD", kg="실제 kg"),
+             [dict(id=run_id, rule=run["rule"], cutoff=run["policy"]["cutoff"], state=state,
+                   usd=rules.Decimal(run["actual_usd"]),
+                   kg=rules.Decimal(run["actual_kg"]) if run["actual_kg"] is not None else None)]),
+            ("회원사별 집계", SUMMARY, rules.summarize(run["ledger"])),
+            ("인정 및 제외 근거", LEDGER, ledger),
+            ("검증 내역", CHECKS, run["checks"] + run["member_issues"]),
+            ("원장 및 출처", books.LINE | dict(id="원장 ID", source="원본 행 ID"), run["rows"]),
+            ("원본 해시", dict(id="원본 행 ID", sheet="시트", row="행", name="파일", sha="SHA-256"), hashes),
+        ]
+        data = books.workbook(sheets)
+        if not bundle:
+            return download(data, f"계산 검증_{run_id}.xlsx")
+        stream = BytesIO()
+        with ZipFile(stream, "w") as archive:
+            archive.writestr(f"계산 검증_{run_id}.xlsx", data)
+            archive.writestr("계산정책.json", json.dumps(run["policy"], ensure_ascii=False, indent=2))
+        return download(stream.getvalue(), f"감사증빙_{run_id}.zip", "application/zip")
+
+    @app.get("/api/backup")
+    def backup():
+        import sqlite3
+        from tempfile import TemporaryDirectory
+
+        with TemporaryDirectory() as temp:
+            target = Path(temp) / "epms.db"
+            with db.connect() as conn:
+                dest = sqlite3.connect(target)
+                try:
+                    conn.connection.driver_connection.backup(dest)
+                finally:
+                    dest.close()
+            return download(target.read_bytes(), "공동정산 수출실적 관리_백업.db", "application/octet-stream")
+
+    def final_blocker(conn, org, run, annual=False):
+        if not run["ready"] or (not annual and not run["accepted_lines"]):
+            return "검증을 완료하고 인정 대상 품목란을 확인하세요."
+        table = store.policies
+        policy = conn.execute(select(table.c.data).where(table.c.org == org,
+                              table.c.year == run["policy"]["year"])).scalar()
+        rows = store.records(conn, store.declarations, org)
+        members = store.records(conn, store.memberships, org)
+        if run["members"] != members or run["policy"] != policy:
+            return "원장, 명부 또는 정책이 변경되었습니다. 다시 계산하세요."
+        if run["rows"] != rows:
+            current = rules.calculate(rows, members, policy) if annual else None
+            if current is None or any(current[key] != run[key] for key in current):
+                return "원장, 명부 또는 정책이 변경되었습니다. 다시 계산하세요."
+        if not annual and policy["cutoff"] != submission.CONFIG["cutoff"]:
+            return "제출양식의 회원 기준일은 2026-12-31입니다."
+        return None
+
+    @app.api_route("/api/org/{org}/annual-submission", methods=["GET", "POST"])
+    def annual_submission(org: int, run_id: int, previous_id: int, request: Request, final: bool = False):
+        table = store.submissions
+        key = "annual-v2"
+        with db.begin() as conn:
+            item = organization(conn, org)
+            run = get_run(conn, org, run_id)
+            year = run["policy"]["year"]
+            previous = get_run(conn, org, previous_id)
+            if previous["policy"]["year"] != year - 1:
+                fail("선택 연도의 직전 연도 계산 결과를 선택하세요.")
+            existing = conn.execute(select(table.c.data).where(table.c.org == org, table.c.first_run == previous_id,
+                                    table.c.second_run == run_id, table.c.sheet == key)).scalar()
+            blocker = None
+            if not existing:
+                for result in (previous, run):
+                    reason = final_blocker(conn, org, result, annual=True)
+                    if reason:
+                        blocker = f"{result['policy']['year']}년 · {reason}"
+                        break
+            if request.method == "GET":
+                return dict(year=year, cutoff=run["policy"]["cutoff"], previous_cutoff=previous["policy"]["cutoff"],
+                            saved=bool(existing), blocker=blocker)
+            filename = f"공동정산_{item}_{year}년_{'최종확정본' if final else '검증미완료'}.xlsx"
+            if final and existing:
+                return download(existing, filename)
+            if final and blocker:
+                fail(blocker)
+            template = next((ROOT / "samples").glob("2027*.xlsx"), None)
+            if not template:
+                fail("제출자료 기준 서식 파일을 찾을 수 없습니다.")
+            try:
+                data = submission.generate(template, previous, run, submission.CONFIG["sheets"][0],
+                                           "최종 확정본" if final else "검증 미완료 · 초안",
+                                           (previous_id, run_id), item=item)
+            except ValueError as exc:
+                fail(str(exc))
+            if final:
+                result = conn.execute(table.insert().values(org=org, first_run=previous_id, second_run=run_id, sheet=key, data=data))
+                store.log(conn, org, actor(request), "최종 확정", result.inserted_primary_key[0],
+                          "연도별 제출자료 확정", None, {"year": year, "run": run_id, "previous_run": previous_id})
+            return download(data, filename)
+
+    @app.get("/api/org/{org}/submission-readiness")
+    def submission_readiness(org: int, first_id: int | None = None, second_id: int | None = None,
+                             sheet: str | None = None):
+        with db.connect() as conn:
+            organization(conn, org)
+            table = store.submissions
+            saved = conn.execute(select(table.c.id).where(table.c.org == org, table.c.first_run == first_id,
+                                 table.c.second_run == second_id, table.c.sheet == sheet)).scalar()
+            output = {}
+            for year, run_id in ((2025, first_id), (2026, second_id)):
+                if run_id is None:
+                    continue
+                run = get_run(conn, org, run_id)
+                if run["policy"]["year"] != year:
+                    fail("연도에 맞는 계산 실행번호를 선택하세요.")
+                output[year] = dict(cutoff=run["policy"]["cutoff"], ready=run["ready"],
+                                    blocker=None if saved else final_blocker(conn, org, run))
+            return dict(years=output, saved=bool(saved))
+
+    @app.post("/api/org/{org}/submission")
+    def submit(org: int, first_id: int, second_id: int, sheet: str, request: Request, final: bool = False):
+        table = store.submissions
+        with db.begin() as conn:
+            name = organization(conn, org)
+            first, second = (get_run(conn, org, i) for i in (first_id, second_id))
+            if (first["policy"]["year"], second["policy"]["year"]) != (2025, 2026):
+                fail("2025년과 2026년 계산 실행번호를 순서대로 선택하세요.")
+            if final:
+                existing = conn.execute(select(table.c.data).where(table.c.org == org, table.c.first_run == first_id,
+                                        table.c.second_run == second_id, table.c.sheet == sheet)).scalar()
+                if existing is not None:
+                    return download(existing, f"공동정산_{name}_최종확정본.xlsx")
+                for run in (first, second):
+                    blocker = final_blocker(conn, org, run)
+                    if blocker:
+                        fail(blocker)
+            template = next((ROOT / "samples").glob("2027*.xlsx"), None)
+            if not template:
+                fail("2027년 공식 양식 파일을 찾을 수 없습니다.")
+            status = "최종 확정본" if final else "검증 미완료 · 초안"
+            try:
+                data = submission.generate(template, first, second, sheet, status, (first_id, second_id))
+            except ValueError as exc:
+                fail(str(exc))
+            if final:
+                result = conn.execute(table.insert().values(org=org, first_run=first_id, second_run=second_id,
+                                      sheet=sheet, data=data))
+                store.log(conn, org, actor(request), "최종 확정", result.inserted_primary_key[0],
+                          "2027년 제출양식 확정", None, {"first": first_id, "second": second_id})
+            return download(data, f"공동정산_{name}_{'최종확정본' if final else '검증미완료'}.xlsx")
+
+    assets = ROOT / "dist"
+    if assets.is_dir():
+        app.mount("/", StaticFiles(directory=assets, html=True), name="frontend")
+    return app
