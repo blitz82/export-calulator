@@ -254,6 +254,27 @@ def test_line_import_saves_incomplete_rows_for_correction(tmp_path):
     assert any(problem["code"] == "D003" for problem in update["issues"])
 
 
+@pytest.mark.parametrize("exclusion", [{"scope": "제외"}, {"status": "취소"}])
+def test_excluded_declaration_can_be_saved_and_does_not_block_matching_row(tmp_path, exclusion):
+    client, _ = client_for(tmp_path / "excluded.db")
+    client.post("/api/organizations", params={"name": "원장 제외"}).raise_for_status()
+    base = "/api/org/1"
+    response = client.post(base + "/data/lines", json=[{"values": exclusion}])
+    response.raise_for_status()
+    saved = response.json()[0]["row"]
+    checks = client.get(base + "/line-checks").json()[str(saved["id"])]
+    assert checks and all(problem["severity"] == "INFO" for problem in checks)
+
+    active = line()
+    excluded = {key: active[key] for key in ("number", "line", "version")} | exclusion | {"id": 3}
+    other_version = excluded | {"id": 4, "version": "2"}
+    result = rules.calculate([active, saved | {"id": 2}, excluded, other_version], MEMBERS, POLICY)
+    assert result["ready"]
+    assert result["accepted_lines"] == 1
+    assert result["actual_usd"] == active["usd"]
+    assert all(item["source_ids"] == [active["id"]] for item in result["ledger"])
+
+
 def test_workflow_and_restore(tmp_path):
     client, app = client_for(tmp_path / "live.db")
     assert client.get("/api/organizations", headers={"x-epms-token":"bad"}).status_code == 403

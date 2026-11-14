@@ -43,6 +43,7 @@ const visibleError = (message:string) => message.replace(/^[MD]\d{3}\s+/, '')
 const defaultLineFields = ['number','usd','hs','shipped','declared','agent_name','owner_name','maker_name']
 const internalLineFields = new Set(['line','version'])
 const newLineDefaults = {line:'1',version:'1',scope:'대상',status:'유효'}
+const isExcludedLine = (row?:Row) => row?.scope==='제외' || row?.status==='취소'
 const hasMissingIdentity = (row:Row) => [...internalLineFields].some(key=>!String(row[key]??'').trim())
 const hasInvalidIdentity = (row:Row) => [...internalLineFields].some(key=>{
   const value = String(row[key]??'').trim()
@@ -108,6 +109,7 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
     ...(kind==='lines' ? [{
       colId:'validation',headerName:'입력 검증',width:125,pinned:'right' as const, cellClass:'validation-cell', headerClass:'validation-header',
       valueGetter: (p: {data?: Row}) => {
+        if (isExcludedLine(p.data)) return '제외'
         if (checks.isPending || checks.isError) return '—'
         const problems = rowChecks[String(p.data?.id)] ?? []
         return problems.some(item=>item.severity==='ERROR')?'확정 차단':problems.some(item=>item.severity==='WARNING')?'확인 필요':'통과'
@@ -179,7 +181,7 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
     await Promise.all([query.refetch(), ...(kind==='lines' ? [checks.refetch()] : [])])
   }
   const save = async () => {
-    if (kind==='lines' && !draft.id && hasInvalidIdentity(draft)) {
+    if (kind==='lines' && !draft.id && !isExcludedLine(draft) && hasInvalidIdentity(draft)) {
       setShowIdentity(true)
       setMessage('품목란 번호와 정정 버전을 확인한 후 저장하세요.')
       await validate(draft)

@@ -95,7 +95,15 @@ def validate_member(row, existing):
     return issues
 
 
+def excluded_line(row):
+    return row.get("scope") == "제외" or row.get("status") == "취소"
+
+
 def validate_line(row, members, policy=None):
+    if excluded_line(row):
+        problem = (issue("D010", "status", "취소된 신고입니다.", "INFO") if row.get("status") == "취소"
+                   else issue("D065", "scope", "공동정산에서 제외된 신고입니다.", "INFO"))
+        return [problem], {}
     issues = []
     number = clean(row.get("number"))
     if not number:
@@ -134,12 +142,10 @@ def validate_line(row, members, policy=None):
         issues.append(issue("D067", "hs", "이 연도의 승인 대상 HS코드 목록을 확인하세요."))
     scope = row.get("scope")
     if scope != "대상":
-        issues.append(issue("D065" if scope == "제외" else "D064", "scope",
-                            "공동정산 대상 여부를 확인하세요.", "INFO" if scope == "제외" else "ERROR"))
+        issues.append(issue("D064", "scope", "공동정산 대상 여부를 확인하세요."))
     status = row.get("status")
     if status != "유효":
-        issues.append(issue("D010", "status", "신고 유효 상태를 확인하세요.",
-                            "INFO" if status == "취소" else "ERROR"))
+        issues.append(issue("D010", "status", "신고 유효 상태를 확인하세요."))
     parties = defaultdict(list)
     confirmed_exporter = False
     non_members_without_number = []
@@ -253,7 +259,7 @@ def calculate(rows, members, policy):
         issues, parties = validate_line(row, index, policy) if relevant else ([], {})
         if relevant:
             checks.extend(dict(problem, row_id=row["id"]) for problem in issues)
-        if all(re.fullmatch(r"[0-9]{1,8}", clean(row.get(k))) and int(row[k]) > 0
+        if not excluded_line(row) and all(re.fullmatch(r"[0-9]{1,8}", clean(row.get(k))) and int(row[k]) > 0
                for k in ("line", "version")) and clean(row.get("number")):
             groups[declaration_key(row)].append((row, issues, parties, relevant))
     accepted_lines = 0
@@ -276,8 +282,6 @@ def calculate(rows, members, policy):
         for duplicate, *_ in candidates[1:]:
             checks.append(dict(issue("D080", "line", "동일한 신고 품목란을 1건으로 합산했습니다.", "INFO"),
                                row_id=duplicate["id"]))
-        if row.get("scope") == "제외" or row.get("status") == "취소":
-            continue
         if member_issues or any(p["severity"] != "INFO" for p in issues):
             continue
         usd, kg = decimal(row["usd"]), decimal(row.get("kg"))
