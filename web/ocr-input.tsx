@@ -17,7 +17,7 @@ const choices:Record<string, string[]> = {
 const numericFields = ['usd','kg'] as const
 
 export function OcrInput({org, fields, members, disabled, onSaved}: {
-  org:number; fields:Fields; members:Row[] | undefined; disabled:boolean; onSaved:(count:number)=>Promise<void>
+  org:number; fields:Fields; members:Row[] | undefined; disabled:boolean; onSaved:(count:number, needsReview:number)=>Promise<void>
 }) {
   const dialog = useRef<HTMLDialogElement>(null)
   const fileInput = useRef<HTMLInputElement>(null)
@@ -127,7 +127,7 @@ export function OcrInput({org, fields, members, disabled, onSaved}: {
       setRows([])
       setDoc(undefined)
       dialog.current?.close()
-      await onSaved(result.imported)
+      await onSaved(result.imported, result.needs_review)
     } catch (error) {
       setMessage((error as Error).message)
     } finally { setBusy(false) }

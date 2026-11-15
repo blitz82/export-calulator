@@ -26,7 +26,6 @@ type ImportResult = {
   imported: number
   rejected: ImportIssue[]
   needs_review?: number
-  duplicates?: ImportIssue[]
   skipped?: number
 }
 type Kind = 'members' | 'lines'
@@ -205,18 +204,13 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
     ++validation.current
     setIssues(result.issues)
     if (!result.row) {
-      const duplicate = result.issues.find(issue=>issue.code==='D080')
-      if (result.issues.some(issue=>issue.code==='D012' || issue.code==='D083')) {
-        setShowIdentity(true)
-        setMessage('기존 품목란과 충돌합니다. 아래의 기존 값과 입력 값을 확인하세요.')
-      } else {
-        setMessage(duplicate?.message ?? '오류 항목을 수정한 후 저장하세요.')
-      }
+      setMessage('오류 항목을 수정한 후 저장하세요.')
       return
     }
     const saved = {...result.row, pdf:draft.pdf}
     setDraft(saved)
     setSelected(saved)
+    if (result.issues.some(issue=>issue.row_id !== undefined)) setShowIdentity(true)
     const needsReview = kind==='lines' && result.issues.some(issue=>issue.severity!=='INFO')
     setMessage(needsReview ? '저장됨 · 보완이 필요한 항목이 남아 있습니다.' : '저장됨 · ' + new Date().toLocaleTimeString('ko-KR'))
     await reload()
@@ -226,12 +220,11 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
     const params = new URLSearchParams({name:file.name})
     const response = await request(`org/${org}/import/${kind}?${params}`, {method:'POST', body:file})
     const result: ImportResult = await response.json()
-    const duplicates = result.duplicates ?? []
-    setIssueRows([...result.rejected, ...duplicates].sort((a,b)=>a.row-b.row))
+    setIssueRows(result.rejected)
     if (result.imported) setSearch('')
     const skipped = result.skipped ? ` · 이미 등록된 사업자번호 ${result.skipped}행 건너뜀` : ''
     setMessage(kind==='lines'
-      ? `${result.profile} 양식 · ${result.imported}행 원장 등록 · 등록된 행 중 ${result.needs_review}행 보완 필요 · 중복 ${duplicates.length}행 건너뜀 · ${result.rejected.length}행 등록 보류`
+      ? `${result.profile} 양식 · ${result.imported}행 원장 등록 · 등록된 행 중 ${result.needs_review}행 보완 필요`
       : `${result.profile} 양식 · ${result.imported}행 저장 · ${result.rejected.length}행 보완 필요${skipped}`)
     await reload()
   }
@@ -240,8 +233,8 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
       <label>자료 검색<input type="search" placeholder={kind==='lines'?'신고번호 또는 업체명':'업체명 또는 사업자번호'} value={search} onChange={e => setSearch(e.target.value)}/></label>
       {kind==='lines' && <button aria-pressed={problemOnly} onClick={()=>setParams(problemOnly?{}:{filter:'issues'})}>보완 필요만</button>}
       <div className="toolbar-spacer"/>
-      {kind==='lines' && <OcrInput org={org} fields={fields} members={members.data} disabled={busy} onSaved={async count=>{
-        setMessage(`OCR 승인 · 원장 ${count}행 등록`)
+      {kind==='lines' && <OcrInput org={org} fields={fields} members={members.data} disabled={busy} onSaved={async (count, needsReview)=>{
+        setMessage(`OCR 승인 · 원장 ${count}행 등록${needsReview ? ` · ${needsReview}행 보완 필요` : ''}`)
         await reload()
       }}/>}
       <details className="excel-menu"><summary className="button">Excel 가져오기·내보내기</summary>

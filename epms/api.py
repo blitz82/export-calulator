@@ -126,8 +126,13 @@ def create_app(path=None):
 
     def validate(conn, org, kind, row):
         index = member_index(conn, org)
-        return (rules.validate_member(row, index.values()) if kind == "members"
-                else rules.validate_line(row, index)[0])
+        if kind == "members":
+            return rules.validate_member(row, index.values())
+        problems = rules.validate_line(row, index)[0]
+        if rules.active_declaration_key(row) is not None:
+            declarations = declaration_index(store.records(conn, store.declarations, org))
+            problems.extend(declaration_issues(row, declarations, row["id"]))
+        return problems
 
     @app.get("/api/organizations")
     def organizations():
@@ -204,18 +209,22 @@ def create_app(path=None):
             organization(conn, org)
             index = member_index(conn, org)
             rows = store.records(conn, store.declarations, org)
+        declarations = declaration_index(rows)
         return {row["id"]: problems for row in rows
-                if (problems := rules.validate_line(row, index)[0])}
+                if (problems := rules.validate_line(row, index)[0] + declaration_issues(row, declarations, row["id"]))}
 
-    def declaration_index(conn, org):
+    def declaration_index(rows):
         index = defaultdict(dict)
-        for row in store.records(conn, store.declarations, org):
+        for row in rows:
             key = rules.active_declaration_key(row)
             if key is not None:
                 index[key][row["id"]] = row
         return index
 
-    def registration_issues(values, candidates, edit_id):
+    def declaration_issues(values, declarations, edit_id):
+        candidates = declarations.get(rules.active_declaration_key(values), {})
+        if not candidates or (len(candidates) == 1 and edit_id in candidates):
+            return []
         version = rules.declaration_version(values)
         incoming = dict(rules.line_fingerprint(values))
         problems = []
@@ -226,7 +235,7 @@ def create_app(path=None):
             label = f'기존 원장 #{row_id} (신고번호 {existing["number"][:80]}, 품목란 {existing["line"]})'
             same_version = version == rules.declaration_version(existing)
             if same_version and incoming == previous:
-                problem = rules.issue("D080", "line", f"{label}와 같은 행이 있어 추가 등록을 건너뛰었습니다.", "INFO")
+                problem = rules.issue("D080", "line", f"{label}와 중복됩니다. 원본을 확인하고 중복 행을 수정하거나 제외하세요.")
             else:
                 changes = [
                     f'{books.LINE[field]} {str(existing.get(field) or "공란")[:80]} → {str(values.get(field) or "공란")[:80]}'
@@ -240,8 +249,7 @@ def create_app(path=None):
                 problem = rules.issue(code, field, f'{label}와 충돌합니다. 기존 값 → 입력 값 ({", ".join(changes)}). '
                                       "원본을 확인하고 기존 행을 수정하거나 대체된 행을 제외하세요.")
             problems.append(dict(problem, row_id=row_id))
-        # A conflict takes precedence when the incoming row also matches a legacy duplicate.
-        return [p for p in problems if p["severity"] != "INFO"] or problems
+        return problems
 
     def save(conn, org, kind, edit, user, source=None, index=None, declarations=None):
         table = table_for(kind)
@@ -263,11 +271,8 @@ def create_app(path=None):
         if kind == "members" and any(p["severity"] == "ERROR" for p in issues):
             return {"issues": issues}
         key = rules.active_declaration_key(values) if declarations is not None else None
-        candidates = declarations.get(key) if key is not None else None
-        if candidates:
-            collisions = registration_issues(values, candidates, edit.id)
-            if collisions:
-                return {"issues": collisions}
+        if key is not None:
+            issues.extend(declaration_issues(values, declarations, edit.id))
         revision = (old.revision if old else 0) + 1
         record = dict(org=org, revision=revision, data=values)
         if kind == "members":
@@ -316,7 +321,7 @@ def create_app(path=None):
                 conn.exec_driver_sql("BEGIN IMMEDIATE")
             organization(conn, org)
             index = member_index(conn, org)
-            declarations = declaration_index(conn, org) if kind == "lines" else None
+            declarations = declaration_index(store.records(conn, store.declarations, org)) if kind == "lines" else None
             return [save(conn, org, kind, edit, actor(request), index=index, declarations=declarations) for edit in edits]
 
     @app.delete("/api/org/{org}/data/lines/{row_id}")
@@ -406,10 +411,10 @@ def create_app(path=None):
                 previous_sources = dict(conn.execute(select(sources.c.row, sources.c.id)
                                         .where(sources.c.file == file_id, sources.c.sheet == sheet_name)).tuples().all())
             index = member_index(conn, org)
-            declarations = declaration_index(conn, org) if kind == "lines" else None
+            declarations = declaration_index(store.records(conn, store.declarations, org)) if kind == "lines" else None
             rejected = []
-            duplicates = []
-            imported = skipped = needs_review = 0
+            imported = skipped = 0
+            imported_ids, review_ids = set(), set()
             for row_index, original in rows:
                 source = previous_sources.get(row_index)
                 values = original
@@ -429,16 +434,17 @@ def create_app(path=None):
                               user, source, index, declarations)
                 if "row" in result:
                     imported += 1
-                    if any(problem["severity"] != "INFO" for problem in result["issues"]):
-                        needs_review += 1
-                elif kind == "lines" and all(p["code"] == "D080" for p in result["issues"]):
-                    duplicates.append(dict(row=row_index, issues=result["issues"]))
+                    row_id = result["row"]["id"]
+                    imported_ids.add(row_id)
+                    for problem in result["issues"]:
+                        if problem["severity"] != "INFO":
+                            review_ids.update((row_id, problem.get("row_id", row_id)))
                 else:
                     rejected.append(dict(row=row_index, issues=result["issues"]))
             if new.rowcount or kind == "lines" or imported:
                 store.log(conn, org, user, "Excel", file_id, "원본 저장" if new.rowcount or kind == "lines" else "원본 재처리",
                           None, dict(name=name, sha=sha, rows=len(rows), imported=imported))
-        summary = {"skipped": skipped} if kind == "members" else {"needs_review": needs_review, "duplicates": duplicates}
+        summary = {"skipped": skipped} if kind == "members" else {"needs_review": len(imported_ids & review_ids)}
         return dict(imported=imported, rejected=rejected, profile=profile, **summary)
 
     ocr_path = "/api/org/{org}/ocr"
@@ -555,7 +561,6 @@ def create_app(path=None):
                 fail("이 PDF는 이미 원장에 등록되었습니다.", 409)
             pages = {row["row"]: row["id"] for row in ocr_pages(conn, file_id)}
             index = member_index(conn, org)
-            existing = set(declaration_index(conn, org))
             errors = []
             validated = []
             for position, row in enumerate(reviewed, 1):
@@ -571,22 +576,24 @@ def create_app(path=None):
                         problems.append(rules.issue("P040", key, "원본 PDF와 수치를 대조하고 확인하세요."))
                 if values.get("fob") and rules.decimal(values["fob"]) != rules.decimal(values.get("usd")):
                     problems.append(rules.issue("P025", "fob", "FOB(USD)와 신고금액(USD)을 대조하세요."))
-                if not any(problem["severity"] == "ERROR" for problem in problems):
-                    key = rules.active_declaration_key(values)
-                    if key is not None:
-                        if key in existing:
-                            problems.append(rules.issue("P011", "line", "동일 신고번호·품목란이 있습니다. 기존 원장에서 중복 또는 정정 여부를 확인하세요."))
-                        existing.add(key)
                 errors.extend(dict(problem, position=position) for problem in problems if problem["severity"] == "ERROR")
                 validated.append((row.page, values))
             if errors:
                 return JSONResponse({"issues": errors}, status_code=422)
             user = actor(request)
+            declarations = declaration_index(store.records(conn, store.declarations, org))
+            imported_ids, review_ids = set(), set()
             for page, values in validated:
-                save(conn, org, "lines", Edit(values=values, reason="OCR 원본 대조 후 승인"), user, pages[page], index)
+                result = save(conn, org, "lines", Edit(values=values, reason="OCR 원본 대조 후 승인"),
+                              user, pages[page], index, declarations)
+                row_id = result["row"]["id"]
+                imported_ids.add(row_id)
+                for problem in result["issues"]:
+                    if problem["severity"] == "ERROR":
+                        review_ids.update((row_id, problem.get("row_id", row_id)))
             store.log(conn, org, user, "PDF", file_id, "OCR 승인", None,
                       dict(sha=file["sha"], rows=len(validated), verified=["usd", "kg"]))
-        return {"imported": len(validated)}
+        return {"imported": len(validated), "needs_review": len(imported_ids & review_ids)}
 
     @app.get("/api/org/{org}/export/{kind}")
     def export_data(org: int, kind: str, template: bool = False):
@@ -596,9 +603,13 @@ def create_app(path=None):
             rows = [] if template else store.records(conn, table, org)
             if kind == "lines" and not template:
                 index = member_index(conn, org)
-                for row in rows:
-                    issues, _ = rules.validate_line(row, index)
-                    row["issues"] = "\n".join(p["code"] + " " + p["message"] for p in issues)
+                declarations = declaration_index(rows)
+                rows = [
+                    dict(row, issues="\n".join(
+                        p["code"] + " " + p["message"]
+                        for p in rules.validate_line(row, index)[0] + declaration_issues(row, declarations, row["id"])
+                    )) for row in rows
+                ]
             fields = FIELDS[kind] | ({"source": "원본 행 ID", "issues": "검증 결과"} if kind == "lines" and not template else {})
         title = "회원사명부" if kind == "members" else "수출신고필증원장"
         member_template = kind == "members" and template

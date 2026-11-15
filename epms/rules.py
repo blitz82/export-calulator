@@ -5,7 +5,7 @@ from collections import defaultdict
 from datetime import date
 from decimal import Decimal, InvalidOperation
 
-VERSION = "EPMS-1.2"
+VERSION = "EPMS-1.3"
 ROLES = ("agent", "owner", "maker")
 NON_MEMBER = "회원사 아님"
 NON_MEMBER_STATES = {NON_MEMBER, "비회원 확인"}
@@ -273,15 +273,15 @@ def calculate(rows, members, policy):
         issues, parties = validate_line(row, index, policy) if relevant else ([], {})
         if relevant:
             checks.extend(dict(problem, row_id=row["id"]) for problem in issues)
-        if not excluded_line(row) and all(re.fullmatch(r"[0-9]{1,8}", clean(row.get(k))) and int(row[k]) > 0
-               for k in ("line", "version")) and clean(row.get("number")):
-            groups[declaration_key(row)].append((row, issues, parties, relevant))
+        key = active_declaration_key(row)
+        if key is not None:
+            groups[key].append((row, issues, parties, relevant))
     accepted_lines = 0
     missing_kg = 0
     for key, candidates in sorted(groups.items()):
         if not any(item[3] for item in candidates):
             continue
-        versions = {int(row["version"]) for row, *_ in candidates}
+        versions = {declaration_version(row) for row, *_ in candidates}
         if len(versions) > 1:
             # Revision numbers alone do not prove the replacement scope.
             checks.extend(dict(issue("D083", "version", "같은 신고번호와 품목란에 서로 다른 정정본이 있습니다. 원본을 대조해 유효한 신고를 확인하고, 대체된 행은 원장에서 제외하세요."),
@@ -292,10 +292,11 @@ def calculate(rows, members, policy):
             checks.extend(dict(issue("D012", "usd", "같은 신고번호와 품목란에 입력 내용이 다른 행이 있습니다. 원본에서 품목란 번호와 입력값을 확인하세요."),
                                row_id=row["id"]) for row, *_ in candidates)
             continue
+        if len(candidates) > 1:
+            checks.extend(dict(issue("D080", "line", "동일한 신고 품목란이 중복 등록되었습니다. 원본을 확인하고 중복 행을 수정하거나 제외하세요."),
+                               row_id=row["id"]) for row, *_ in candidates)
+            continue
         row, issues, parties, _ = candidates[0]
-        for duplicate, *_ in candidates[1:]:
-            checks.append(dict(issue("D080", "line", "동일한 신고 품목란을 1건으로 합산했습니다.", "INFO"),
-                               row_id=duplicate["id"]))
         if member_issues or any(p["severity"] != "INFO" for p in issues):
             continue
         usd, kg = decimal(row["usd"]), decimal(row.get("kg"))

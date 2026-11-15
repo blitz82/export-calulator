@@ -80,8 +80,8 @@ def test_number_omission_does_not_bypass_validation(row):
 
 def test_legacy_non_member_state_matches_new_state():
     result = rules.calculate([line("XBC"), line("XBC", id=2, agent_state="비회원 확인")], MEMBERS, POLICY)
-    assert result["ready"] and result["accepted_lines"] == 1
-    assert {r["name"] for r in result["ledger"]} == {"B", "C"}
+    assert not result["ready"] and result["accepted_lines"] == 0
+    assert {p["code"] for p in result["checks"]} == {"D080"}
 
 
 def test_member_cannot_be_marked_non_member():
@@ -115,12 +115,12 @@ def test_producer_requires_eligibility_on_cutoff():
     assert "D049" in {problem["code"] for problem in result["checks"]}
 
 
-def test_dedup_and_distinct_lines():
+def test_duplicate_group_is_held_and_distinct_lines_are_counted():
     result = rules.calculate([line(), line(id=2, usd="10,000.010"), line(id=3, line="2")], MEMBERS, POLICY)
-    assert result["ready"] and result["accepted_lines"] == 2
-    assert Decimal(result["actual_usd"]) == Decimal("20000.02")
-    assert len(result["ledger"]) == 6
-    assert result["ledger"][0]["source_ids"] == [1, 2]
+    assert not result["ready"] and result["accepted_lines"] == 1
+    assert Decimal(result["actual_usd"]) == Decimal("10000.01")
+    assert len(result["ledger"]) == 3
+    assert {p["row_id"] for p in result["checks"] if p["code"] == "D080"} == {1, 2}
 
 
 @pytest.mark.parametrize("change,code", [({"version":"2"},"D083"), ({"usd":"7"},"D012"),
@@ -185,37 +185,48 @@ def test_registration_checks_active_declaration_lines(tmp_path, method):
         client.post(base + "/data/members", json=[edit(member) for member in MEMBERS]).raise_for_status()
         if method == "manual":
             results = client.post(path, json=[edit(row) for row in rows]).raise_for_status().json()
-            assert [bool(r.get("row")) for r in results] == [True, True, False, False, False]
-            duplicate_issue, amount_issue, version_issue = [r["issues"][0] for r in results[2:]]
+            assert all(r.get("row") for r in results)
         else:
             workbook = books.workbook([("원장", books.LINE, rows)])
             url = base + "/import/lines"
             response = client.post(url, params={"name": "가상.xlsx"}, content=workbook).raise_for_status().json()
-            assert (response["imported"], response["needs_review"]) == (2, 0)
-            duplicate_row, = response["duplicates"]
-            amount_row, version_row = response["rejected"]
-            assert [row["row"] for row in (duplicate_row, amount_row, version_row)] == [4, 5, 6]
-            duplicate_issue, amount_issue, version_issue = [
-                row["issues"][0] for row in (duplicate_row, amount_row, version_row)
-            ]
+            assert (response["imported"], response["needs_review"], response["rejected"]) == (5, 5, [])
             assert client.post(url, params={"name": "복사.xlsx"}, content=workbook).status_code == 409
 
-        assert [p["code"] for p in (duplicate_issue, amount_issue, version_issue)] == ["D080", "D012", "D083"]
+        saved_first, saved_second, saved_duplicate, saved_changed, saved_corrected = client.get(path).raise_for_status().json()
+        checks = client.get(base + "/line-checks").raise_for_status().json()
+        assert set(checks) == {str(row["id"]) for row in (saved_first, saved_second, saved_duplicate, saved_changed, saved_corrected)}
+        def related(saved, code):
+            return next(p for p in checks[str(saved["id"])] if p["code"] == code)
+
+        assert related(saved_duplicate, "D080")["severity"] == "ERROR"
+        amount_issue = related(saved_changed, "D012")
+        version_issue = related(saved_corrected, "D083")
         assert "100 → 110" in amount_issue["message"]
         assert "정정 버전 1 → 2" in version_issue["message"]
-        saved_first, saved_second = client.get(path).raise_for_status().json()
         assert amount_issue["row_id"] == saved_first["id"]
         assert version_issue["row_id"] == saved_second["id"]
+        report = client.get(base + "/export/lines").raise_for_status()
+        book = load_workbook(BytesIO(report.content), read_only=True)
+        try:
+            exported = list(book.active.values)
+            issues_column = exported[0].index("검증 결과")
+            assert "D080" in exported[3][issues_column]
+            assert "D083" in exported[5][issues_column]
+        finally:
+            book.close()
 
         def update(saved, values):
             payload = edit(values) | {"id": saved["id"], "revision": saved["revision"]}
             result, = client.post(path, json=[payload]).raise_for_status().json()
             return result
 
-        assert update(saved_first, first | {"line": "2"})["issues"][0]["code"] == "D012"
+        blocked_total = rules.calculate(client.get(path).json(), MEMBERS, POLICY)
+        assert not blocked_total["ready"] and blocked_total["accepted_lines"] == 0
+        for row, values in ((saved_duplicate, duplicate), (saved_changed, changed), (saved_second, second)):
+            assert update(row, values | {"scope": "제외"})["row"]["scope"] == "제외"
         assert update(saved_first, changed)["row"]["usd"] == "110"
-        assert update(saved_second, second | {"scope": "제외"})["row"]["scope"] == "제외"
-        assert client.post(path, json=[edit(corrected)]).raise_for_status().json()[0]["row"]["version"] == "2"
+        assert all(p["severity"] == "INFO" for issues in client.get(base + "/line-checks").json().values() for p in issues)
         saved = client.get(path).raise_for_status().json()
         result = rules.calculate(saved, MEMBERS, POLICY)
         assert result["ready"] and result["accepted_lines"] == 2
@@ -225,7 +236,7 @@ def test_registration_checks_active_declaration_lines(tmp_path, method):
         app.state.db.dispose()
 
 
-def test_concurrent_registration_saves_only_one_active_line(tmp_path):
+def test_concurrent_registration_saves_and_flags_both_lines(tmp_path):
     client, app = client_for(tmp_path / "concurrent.db")
     try:
         client.post("/api/organizations", params={"name": "동시 등록"}).raise_for_status()
@@ -236,10 +247,11 @@ def test_concurrent_registration_saves_only_one_active_line(tmp_path):
                 lambda _: client.post(path, json=[{"values": values}]).raise_for_status().json()[0],
                 range(2),
             ))
-        assert sum("row" in result for result in results) == 1
-        skipped, = [result for result in results if "row" not in result]
-        assert skipped["issues"][0]["code"] == "D080"
-        assert len(client.get(path).raise_for_status().json()) == 1
+        assert len({result["row"]["id"] for result in results}) == 2
+        checks = client.get("/api/org/1/line-checks").raise_for_status().json()
+        assert all(any(p["code"] == "D080" and p["severity"] == "ERROR" for p in issues)
+                   for issues in checks.values())
+        assert len(checks) == 2
     finally:
         client.close()
         app.state.db.dispose()
@@ -263,12 +275,14 @@ def test_ocr_approval_checks_active_declaration_lines(tmp_path):
             conn.execute(store.import_rows.insert().values(file=file_id, sheet="PDF", row=1, original={}))
         url = f"{base}/ocr/{file_id}/approve"
         reviewed = {"page": 1, "values": values, "verified_usd": values["usd"], "verified_kg": values["kg"]}
-        conflict = client.post(url, json=[reviewed])
-        assert conflict.status_code == 422
-        assert [p["code"] for p in conflict.json()["issues"]] == ["P011"]
+        unverified = client.post(url, json=[reviewed | {"verified_usd": ""}])
+        assert unverified.status_code == 422
+        assert [p["code"] for p in unverified.json()["issues"]] == ["P040"]
         corrected = reviewed | {"values": values | {"line": "2", "version": "2"}}
-        assert client.post(url, json=[corrected]).raise_for_status().json()["imported"] == 1
-        assert len(client.get(path).raise_for_status().json()) == 3
+        assert client.post(url, json=[reviewed, corrected]).raise_for_status().json() == {"imported": 2, "needs_review": 1}
+        assert len(client.get(path).raise_for_status().json()) == 4
+        checks = client.get(base + "/line-checks").raise_for_status().json()
+        assert sum(any(p["code"] == "D080" for p in issues) for issues in checks.values()) == 2
     finally:
         client.close()
         app.state.db.dispose()
