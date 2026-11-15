@@ -1,6 +1,7 @@
 import json
 import os
 import secrets
+from collections import defaultdict
 from io import BytesIO
 from pathlib import Path
 from urllib.parse import quote
@@ -206,7 +207,43 @@ def create_app(path=None):
         return {row["id"]: problems for row in rows
                 if (problems := rules.validate_line(row, index)[0])}
 
-    def save(conn, org, kind, edit, user, source=None, index=None):
+    def declaration_index(conn, org):
+        index = defaultdict(dict)
+        for row in store.records(conn, store.declarations, org):
+            key = rules.active_declaration_key(row)
+            if key is not None:
+                index[key][row["id"]] = row
+        return index
+
+    def registration_issues(values, candidates, edit_id):
+        version = rules.declaration_version(values)
+        incoming = dict(rules.line_fingerprint(values))
+        problems = []
+        for row_id, existing in candidates.items():
+            if row_id == edit_id:
+                continue
+            previous = dict(rules.line_fingerprint(existing))
+            label = f'기존 원장 #{row_id} (신고번호 {existing["number"][:80]}, 품목란 {existing["line"]})'
+            same_version = version == rules.declaration_version(existing)
+            if same_version and incoming == previous:
+                problem = rules.issue("D080", "line", f"{label}와 같은 행이 있어 추가 등록을 건너뛰었습니다.", "INFO")
+            else:
+                changes = [
+                    f'{books.LINE[field]} {str(existing.get(field) or "공란")[:80]} → {str(values.get(field) or "공란")[:80]}'
+                    for field in books.LINE if previous.get(field) != incoming.get(field)
+                ]
+                if not same_version:
+                    changes.insert(0, f'정정 버전 {existing.get("version") or "공란"} → {values.get("version") or "공란"}')
+                    code, field = "D083", "version"
+                else:
+                    code, field = "D012", "line"
+                problem = rules.issue(code, field, f'{label}와 충돌합니다. 기존 값 → 입력 값 ({", ".join(changes)}). '
+                                      "원본을 확인하고 기존 행을 수정하거나 대체된 행을 제외하세요.")
+            problems.append(dict(problem, row_id=row_id))
+        # A conflict takes precedence when the incoming row also matches a legacy duplicate.
+        return [p for p in problems if p["severity"] != "INFO"] or problems
+
+    def save(conn, org, kind, edit, user, source=None, index=None, declarations=None):
         table = table_for(kind)
         values = {key: rules.clean(value) for key, value in edit.values.items() if key in FIELDS[kind]}
         if any(len(v) > 4000 for v in values.values()):
@@ -225,6 +262,12 @@ def create_app(path=None):
                   else rules.validate_line(row, index)[0])
         if kind == "members" and any(p["severity"] == "ERROR" for p in issues):
             return {"issues": issues}
+        key = rules.active_declaration_key(values) if declarations is not None else None
+        candidates = declarations.get(key) if key is not None else None
+        if candidates:
+            collisions = registration_issues(values, candidates, edit.id)
+            if collisions:
+                return {"issues": collisions}
         revision = (old.revision if old else 0) + 1
         record = dict(org=org, revision=revision, data=values)
         if kind == "members":
@@ -253,6 +296,12 @@ def create_app(path=None):
         row = dict(values, id=row_id, revision=revision)
         if kind == "lines":
             row["source"] = old.source if old else source
+            if declarations is not None:
+                old_key = rules.active_declaration_key(old.data) if old else None
+                if old_key is not None:
+                    declarations[old_key].pop(row_id, None)
+                if key is not None:
+                    declarations[key][row_id] = row
         else:
             index[number] = row
         store.log(conn, org, user, kind, row_id, edit.reason, old.data if old else None, row)
@@ -263,9 +312,12 @@ def create_app(path=None):
         if not 1 <= len(edits) <= 1000:
             fail("한 번에 1,000행까지 저장할 수 있습니다.")
         with db.begin() as conn:
+            if kind == "lines":
+                conn.exec_driver_sql("BEGIN IMMEDIATE")
             organization(conn, org)
             index = member_index(conn, org)
-            return [save(conn, org, kind, edit, actor(request), index=index) for edit in edits]
+            declarations = declaration_index(conn, org) if kind == "lines" else None
+            return [save(conn, org, kind, edit, actor(request), index=index, declarations=declarations) for edit in edits]
 
     @app.delete("/api/org/{org}/data/lines/{row_id}")
     def delete_line(org: int, row_id: int, revision: int, reason: str, request: Request):
@@ -331,6 +383,8 @@ def create_app(path=None):
             fail("Excel 파일 구조를 확인하거나 표준 양식을 사용하세요.")
         sha = books.digest(data)
         with db.begin() as conn:
+            if kind == "lines":
+                conn.exec_driver_sql("BEGIN IMMEDIATE")
             organization(conn, org)
             table = store.import_files
             new = conn.execute(insert(table).values(org=org, sha=sha, kind=kind, name=name, data=data)
@@ -352,7 +406,9 @@ def create_app(path=None):
                 previous_sources = dict(conn.execute(select(sources.c.row, sources.c.id)
                                         .where(sources.c.file == file_id, sources.c.sheet == sheet_name)).tuples().all())
             index = member_index(conn, org)
+            declarations = declaration_index(conn, org) if kind == "lines" else None
             rejected = []
+            duplicates = []
             imported = skipped = needs_review = 0
             for row_index, original in rows:
                 source = previous_sources.get(row_index)
@@ -369,17 +425,20 @@ def create_app(path=None):
                 if source is None:
                     source = conn.execute(sources.insert().values(file=file_id, sheet=sheet_name,
                                           row=row_index, original=original)).inserted_primary_key[0]
-                result = save(conn, org, kind, Edit(values=values, reason=f"Excel 가져오기 ({source})"), user, source, index)
+                result = save(conn, org, kind, Edit(values=values, reason=f"Excel 가져오기 ({source})"),
+                              user, source, index, declarations)
                 if "row" in result:
                     imported += 1
                     if any(problem["severity"] != "INFO" for problem in result["issues"]):
                         needs_review += 1
+                elif kind == "lines" and all(p["code"] == "D080" for p in result["issues"]):
+                    duplicates.append(dict(row=row_index, issues=result["issues"]))
                 else:
                     rejected.append(dict(row=row_index, issues=result["issues"]))
             if new.rowcount or kind == "lines" or imported:
                 store.log(conn, org, user, "Excel", file_id, "원본 저장" if new.rowcount or kind == "lines" else "원본 재처리",
                           None, dict(name=name, sha=sha, rows=len(rows), imported=imported))
-        summary = {"skipped": skipped} if kind == "members" else {"needs_review": needs_review}
+        summary = {"skipped": skipped} if kind == "members" else {"needs_review": needs_review, "duplicates": duplicates}
         return dict(imported=imported, rejected=rejected, profile=profile, **summary)
 
     ocr_path = "/api/org/{org}/ocr"
@@ -496,12 +555,7 @@ def create_app(path=None):
                 fail("이 PDF는 이미 원장에 등록되었습니다.", 409)
             pages = {row["row"]: row["id"] for row in ocr_pages(conn, file_id)}
             index = member_index(conn, org)
-            existing = set()
-            for row in store.records(conn, store.declarations, org):
-                try:
-                    existing.add(rules.declaration_key(row))
-                except (KeyError, ValueError, TypeError):
-                    continue
+            existing = set(declaration_index(conn, org))
             errors = []
             validated = []
             for position, row in enumerate(reviewed, 1):
@@ -518,10 +572,11 @@ def create_app(path=None):
                 if values.get("fob") and rules.decimal(values["fob"]) != rules.decimal(values.get("usd")):
                     problems.append(rules.issue("P025", "fob", "FOB(USD)와 신고금액(USD)을 대조하세요."))
                 if not any(problem["severity"] == "ERROR" for problem in problems):
-                    key = rules.declaration_key(values)
-                    if key in existing:
-                        problems.append(rules.issue("P011", "line", "동일 신고번호·품목란이 있습니다. 기존 원장에서 중복 또는 정정 여부를 확인하세요."))
-                    existing.add(key)
+                    key = rules.active_declaration_key(values)
+                    if key is not None:
+                        if key in existing:
+                            problems.append(rules.issue("P011", "line", "동일 신고번호·품목란이 있습니다. 기존 원장에서 중복 또는 정정 여부를 확인하세요."))
+                        existing.add(key)
                 errors.extend(dict(problem, position=position) for problem in problems if problem["severity"] == "ERROR")
                 validated.append((row.page, values))
             if errors:

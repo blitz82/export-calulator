@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal
 from io import BytesIO
 from pathlib import Path
@@ -162,6 +163,115 @@ def client_for(path):
     token = client.get("/api/session").json()["token"]
     client.headers["x-epms-token"] = token
     return client, app
+
+
+@pytest.mark.parametrize("method", ["manual", "excel"])
+def test_registration_checks_active_declaration_lines(tmp_path, method):
+    client, app = client_for(tmp_path / "registration.db")
+    base = "/api/org/1"
+    path = base + "/data/lines"
+
+    def edit(row):
+        return {"values": {k: v for k, v in row.items() if k != "id"}}
+
+    first = line(usd="100", kg="10")
+    second = line(line="2", usd="200", kg="20")
+    duplicate = first | {"number": "1234526123456", "line": "01", "version": "01", "usd": "100.00"}
+    changed = first | {"usd": "110"}
+    corrected = second | {"version": "2", "usd": "250", "kg": "25"}
+    rows = [first, second, duplicate, changed, corrected]
+    try:
+        client.post("/api/organizations", params={"name": "가상 신고"}).raise_for_status()
+        client.post(base + "/data/members", json=[edit(member) for member in MEMBERS]).raise_for_status()
+        if method == "manual":
+            results = client.post(path, json=[edit(row) for row in rows]).raise_for_status().json()
+            assert [bool(r.get("row")) for r in results] == [True, True, False, False, False]
+            duplicate_issue, amount_issue, version_issue = [r["issues"][0] for r in results[2:]]
+        else:
+            workbook = books.workbook([("원장", books.LINE, rows)])
+            url = base + "/import/lines"
+            response = client.post(url, params={"name": "가상.xlsx"}, content=workbook).raise_for_status().json()
+            assert (response["imported"], response["needs_review"]) == (2, 0)
+            duplicate_row, = response["duplicates"]
+            amount_row, version_row = response["rejected"]
+            assert [row["row"] for row in (duplicate_row, amount_row, version_row)] == [4, 5, 6]
+            duplicate_issue, amount_issue, version_issue = [
+                row["issues"][0] for row in (duplicate_row, amount_row, version_row)
+            ]
+            assert client.post(url, params={"name": "복사.xlsx"}, content=workbook).status_code == 409
+
+        assert [p["code"] for p in (duplicate_issue, amount_issue, version_issue)] == ["D080", "D012", "D083"]
+        assert "100 → 110" in amount_issue["message"]
+        assert "정정 버전 1 → 2" in version_issue["message"]
+        saved_first, saved_second = client.get(path).raise_for_status().json()
+        assert amount_issue["row_id"] == saved_first["id"]
+        assert version_issue["row_id"] == saved_second["id"]
+
+        def update(saved, values):
+            payload = edit(values) | {"id": saved["id"], "revision": saved["revision"]}
+            result, = client.post(path, json=[payload]).raise_for_status().json()
+            return result
+
+        assert update(saved_first, first | {"line": "2"})["issues"][0]["code"] == "D012"
+        assert update(saved_first, changed)["row"]["usd"] == "110"
+        assert update(saved_second, second | {"scope": "제외"})["row"]["scope"] == "제외"
+        assert client.post(path, json=[edit(corrected)]).raise_for_status().json()[0]["row"]["version"] == "2"
+        saved = client.get(path).raise_for_status().json()
+        result = rules.calculate(saved, MEMBERS, POLICY)
+        assert result["ready"] and result["accepted_lines"] == 2
+        assert result["actual_usd"] == "360" and result["actual_kg"] == "35"
+    finally:
+        client.close()
+        app.state.db.dispose()
+
+
+def test_concurrent_registration_saves_only_one_active_line(tmp_path):
+    client, app = client_for(tmp_path / "concurrent.db")
+    try:
+        client.post("/api/organizations", params={"name": "동시 등록"}).raise_for_status()
+        path = "/api/org/1/data/lines"
+        values = {k: v for k, v in line().items() if k != "id"}
+        with ThreadPoolExecutor(max_workers=2) as workers:
+            results = list(workers.map(
+                lambda _: client.post(path, json=[{"values": values}]).raise_for_status().json()[0],
+                range(2),
+            ))
+        assert sum("row" in result for result in results) == 1
+        skipped, = [result for result in results if "row" not in result]
+        assert skipped["issues"][0]["code"] == "D080"
+        assert len(client.get(path).raise_for_status().json()) == 1
+    finally:
+        client.close()
+        app.state.db.dispose()
+
+
+def test_ocr_approval_checks_active_declaration_lines(tmp_path):
+    client, app = client_for(tmp_path / "ocr-registration.db")
+    base = "/api/org/1"
+    path = base + "/data/lines"
+    values = {k: v for k, v in line().items() if k != "id"}
+    try:
+        client.post("/api/organizations", params={"name": "OCR 중복 검증"}).raise_for_status()
+        client.post(base + "/data/members", json=[
+            {"values": {k: v for k, v in member.items() if k != "id"}} for member in MEMBERS
+        ]).raise_for_status()
+        client.post(path, json=[{"values": values}, {"values": values | {"line": "2", "status": "취소"}}]).raise_for_status()
+        with app.state.db.begin() as conn:
+            file_id = conn.execute(store.import_files.insert().values(
+                org=1, kind="pdf", name="가상.pdf", sha="synthetic", data=b"fixture",
+            )).inserted_primary_key[0]
+            conn.execute(store.import_rows.insert().values(file=file_id, sheet="PDF", row=1, original={}))
+        url = f"{base}/ocr/{file_id}/approve"
+        reviewed = {"page": 1, "values": values, "verified_usd": values["usd"], "verified_kg": values["kg"]}
+        conflict = client.post(url, json=[reviewed])
+        assert conflict.status_code == 422
+        assert [p["code"] for p in conflict.json()["issues"]] == ["P011"]
+        corrected = reviewed | {"values": values | {"line": "2", "version": "2"}}
+        assert client.post(url, json=[corrected]).raise_for_status().json()["imported"] == 1
+        assert len(client.get(path).raise_for_status().json()) == 3
+    finally:
+        client.close()
+        app.state.db.dispose()
 
 
 def test_member_import_recovers_previously_rejected_workbook(tmp_path):

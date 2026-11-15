@@ -20,6 +20,15 @@ export type Fields = Record<string, string>
 export type Row = {id?: number; revision?: number; source?: number | null; pdf?: PdfSource | null; [key: string]: unknown}
 export type Problem = {code: string; field: string; message: string; severity: string; row_id?: number}
 type Result = {row?: Row; issues: Problem[]}
+type ImportIssue = {row: number; issues: Problem[]}
+type ImportResult = {
+  profile: string
+  imported: number
+  rejected: ImportIssue[]
+  needs_review?: number
+  duplicates?: ImportIssue[]
+  skipped?: number
+}
 type Kind = 'members' | 'lines'
 const options: Record<string, string[]> = {
   kind:['생산자','수출업체','복수'], scope:['대상','제외','미확정'], status:['유효','취소','미확정'],
@@ -40,7 +49,7 @@ function nameRank(query:string, name:string) {
   return shorter.slice(first+offset)===longer.slice(first+1)?2:Infinity
 }
 const visibleError = (message:string) => message.replace(/^[MD]\d{3}\s+/, '')
-const defaultLineFields = ['number','usd','hs','shipped','declared','agent_name','owner_name','maker_name']
+const defaultLineFields = ['number','line','usd','hs','shipped','declared','agent_name','owner_name','maker_name']
 const internalLineFields = new Set(['line','version'])
 const newLineDefaults = {line:'1',version:'1',scope:'대상',status:'유효'}
 const isExcludedLine = (row?:Row) => row?.scope==='제외' || row?.status==='취소'
@@ -56,7 +65,8 @@ const numeric = new Set(['usd','fob','kg','quantity'])
 
 export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields: Fields}) {
   const displayFields = useMemo(() => kind==='lines'
-    ? Object.fromEntries(Object.entries(fields).filter(([key])=>!internalLineFields.has(key)))
+    ? Object.fromEntries(Object.entries(fields).filter(([key])=>key!=='version')
+      .map(([key,label])=>[key,key==='line'?'품목란 번호':label]))
     : fields, [fields, kind])
   const path = `org/${org}/data/${kind}`
   const query = useQuery({queryKey:[path], queryFn:() => get<Row[]>(path)})
@@ -76,7 +86,7 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
   const [hidden, setHidden] = useState<string[]>(() => kind==='lines' ? Object.keys(displayFields).filter(key=>!defaultLineFields.includes(key)) : [])
   const [showExtras, setShowExtras] = useState(false)
   const [showIdentity, setShowIdentity] = useState(false)
-  const [issueRows, setIssueRows] = useState<{row: number; issues: Problem[]}[]>([])
+  const [issueRows, setIssueRows] = useState<ImportIssue[]>([])
   const validation = useRef(0)
   const grid = useRef<GridApi<Row> | null>(null)
   const nextIssue = useRef(0)
@@ -95,10 +105,10 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
     ...(kind==='lines' ? [...defaultLineFields,...Object.keys(displayFields).filter(key=>!defaultLineFields.includes(key))]
       : Object.keys(displayFields)).map(key => ({
       field:key, headerName:displayFields[key], minWidth:key === 'name' ? 195 : 90,
-      width:key==='number'||key==='product'?165:130,
+      width:key==='number'||key==='product'?165:key==='line'?105:130,
       valueFormatter:(p:{value:unknown})=>numeric.has(key)
         ? String(p.value??'').replace(/^-?\d+/, value=>value.replace(/\B(?=(\d{3})+(?!\d))/g,',')) : String(p.value??''),
-      hide:hidden.includes(key), pinned:key==='number' ? 'left' as const : undefined,
+      hide:hidden.includes(key), pinned:key==='number'||key==='line' ? 'left' as const : undefined,
       cellClassRules: {
         'cell-error': (p:CellClassParams<Row>) => !!rowChecks[String(p.data?.id)]?.some(item=>item.field===key&&item.severity==='ERROR'),
         'cell-warning': (p:CellClassParams<Row>) => !!rowChecks[String(p.data?.id)]?.some(item=>item.field===key&&item.severity==='WARNING'),
@@ -145,6 +155,10 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
     const row = rows.find(row=>row.id===id)
     if (row) select(row)
   })
+  const existingRowButton = (problem:Problem) => {
+    const row = rows.find(row=>row.id===problem.row_id)
+    return row && <button type="button" disabled={busy} onClick={()=>select(row)}>기존 행 {row.id} 열기</button>
+  }
   const requestedId = params.has('row') && !query.isFetching
     ? rows.find(row=>String(row.id)===params.get('row'))?.id : undefined
   const openedRow = useRef<number>(undefined)
@@ -190,7 +204,16 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
     const [result] = await send<Result[]>(path, [{id:draft.id, revision:draft.revision, values:values(draft)}])
     ++validation.current
     setIssues(result.issues)
-    if (!result.row) { setMessage('오류 항목을 수정한 후 저장하세요.'); return }
+    if (!result.row) {
+      const duplicate = result.issues.find(issue=>issue.code==='D080')
+      if (result.issues.some(issue=>issue.code==='D012' || issue.code==='D083')) {
+        setShowIdentity(true)
+        setMessage('기존 품목란과 충돌합니다. 아래의 기존 값과 입력 값을 확인하세요.')
+      } else {
+        setMessage(duplicate?.message ?? '오류 항목을 수정한 후 저장하세요.')
+      }
+      return
+    }
     const saved = {...result.row, pdf:draft.pdf}
     setDraft(saved)
     setSelected(saved)
@@ -199,14 +222,16 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
     await reload()
   }
   const upload = async (file: File) => {
+    setIssueRows([])
     const params = new URLSearchParams({name:file.name})
     const response = await request(`org/${org}/import/${kind}?${params}`, {method:'POST', body:file})
-    const result = await response.json()
-    setIssueRows(result.rejected)
+    const result: ImportResult = await response.json()
+    const duplicates = result.duplicates ?? []
+    setIssueRows([...result.rejected, ...duplicates].sort((a,b)=>a.row-b.row))
     if (result.imported) setSearch('')
     const skipped = result.skipped ? ` · 이미 등록된 사업자번호 ${result.skipped}행 건너뜀` : ''
     setMessage(kind==='lines'
-      ? `${result.profile} 양식 · ${result.imported}행 원장 등록 · 등록된 행 중 ${result.needs_review}행 보완 필요`
+      ? `${result.profile} 양식 · ${result.imported}행 원장 등록 · 등록된 행 중 ${result.needs_review}행 보완 필요 · 중복 ${duplicates.length}행 건너뜀 · ${result.rejected.length}행 등록 보류`
       : `${result.profile} 양식 · ${result.imported}행 저장 · ${result.rejected.length}행 보완 필요${skipped}`)
     await reload()
   }
@@ -241,8 +266,12 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
     <div className="ledger-status"><span>{visibleRows.length.toLocaleString('ko-KR')}행</span>
       <span role="status">{busy ? '처리 중…' : message || (dirty ? '저장 전 변경사항' : query.isError || checks.isError ? '자료를 불러오지 못했습니다.' : '행을 선택하여 수정할 수 있습니다.')}</span>
     </div>
-    {!!issueRows.length && <details className="compact" open={kind==='members'}><summary>일괄 입력 검증 · {issueRows.length}행</summary>
-      {issueRows.slice(0,200).map(row => <p key={row.row}>{row.row}행 · {row.issues.map(p=>p.message).join(' / ')}</p>)}
+    {!!issueRows.length && <details className="compact" open><summary>일괄 입력 검증 · {issueRows.length}행</summary>
+      {issueRows.slice(0,200).map(row => <div key={row.row}>
+        {row.issues.map(problem => <p key={`${problem.code}-${problem.field}-${problem.row_id}`}>
+          {row.row}행 · {problem.message} {existingRowButton(problem)}
+        </p>)}
+      </div>)}
     </details>}
     <div className="ledger-split"><div className="grid-shell ledger-grid"><AgGridReact<Row> theme={kind==='members' ? memberTheme : theme} onGridReady={event => {grid.current=event.api}}
       rowData={visibleRows} columnDefs={columns} quickFilterText={search} loading={query.isLoading || (problemOnly && checks.isLoading)}
@@ -267,10 +296,11 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
         }}>다음 오류로 이동</button></div>
         {kind==='lines' && <ul>
           {issues.filter(problem=>problem.severity!=='INFO').map(problem=>
-            <li key={`${problem.field}-${problem.code}`}>
+            <li key={`${problem.field}-${problem.code}-${problem.row_id}`}>
               <button type="button" onClick={()=>focus(problem.field)}>
                 {fields[problem.field]} · {problem.message}
               </button>
+              {existingRowButton(problem)}
             </li>)}
         </ul>}
       </div>}
@@ -360,7 +390,7 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
               }}>비어 있는 항목에 1 넣기</button>}
               {[...internalLineFields].map(key=>renderField([key,fields[key]]))}
             </fieldset>}
-            {entries.filter(([key])=>!roleKeys.has(key.split('_')[0])&&!extraLineFields.has(key)).map(renderField)}
+            {entries.filter(([key])=>!internalLineFields.has(key)&&!roleKeys.has(key.split('_')[0])&&!extraLineFields.has(key)).map(renderField)}
             {[...roleKeys].map(role=><fieldset className="party-fields" key={role}>
               <legend>{fields[role+'_name']}</legend>
               {role==='maker' && <ProducerSelect members={members.data} onSelect={member=>{

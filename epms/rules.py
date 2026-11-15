@@ -221,6 +221,20 @@ def declaration_key(row):
     return clean(row.get("number")).replace("-", "").upper(), int(row["line"])
 
 
+def declaration_version(row):
+    value = clean(row.get("version"))
+    return int(value) if re.fullmatch(r"[0-9]{1,8}", value) else value
+
+
+def active_declaration_key(row):
+    if excluded_line(row) or not clean(row.get("number")):
+        return None
+    line = clean(row.get("line"))
+    if re.fullmatch(r"[0-9]{1,8}", line) and int(line) > 0:
+        return declaration_key(row)
+    return None
+
+
 def line_fingerprint(row):
     ignored = {"id", "source", "revision", "number", "line", "version"}
     values = {}
