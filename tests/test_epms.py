@@ -9,7 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 from openpyxl import load_workbook
 
-from epms import books, rules, store
+from epms import books, ocr, rules, store
 from epms.api import create_app
 
 SAMPLES = Path(__file__).resolve().parents[1] / "samples"
@@ -257,6 +257,81 @@ def test_concurrent_registration_saves_and_flags_both_lines(tmp_path):
         app.state.db.dispose()
 
 
+@pytest.mark.parametrize("old_fields", [{}, {"evidence": [{}]}])
+def test_ocr_reupload_refreshes_legacy_draft_without_registering_lines(tmp_path, monkeypatch, old_fields):
+    client, app = client_for(tmp_path / "ocr-legacy.db")
+    source = b"%PDF-test"
+    try:
+        client.post("/api/organizations", params={"name": "OCR 재접수 검증"}).raise_for_status()
+        with app.state.db.begin() as conn:
+            file_id = conn.execute(store.import_files.insert().values(
+                org=1, kind="pdf", name="synthetic.pdf", sha=books.digest(source), data=source,
+            )).inserted_primary_key[0]
+            page_id = conn.execute(store.import_rows.insert().values(
+                file=file_id, sheet="PDF", row=1, original={"page": 1, "rows": [{}]} | old_fields,
+            )).inserted_primary_key[0]
+        page = {"page": 1, "rows": [{"line": "001"}], "evidence": [{}], "extractor_version": ocr.EXTRACTION_VERSION}
+        calls = []
+
+        def extract(data):
+            calls.append(data)
+            return [page]
+
+        monkeypatch.setattr(ocr, "extract", extract)
+        for _ in range(2):
+            result = client.post("/api/org/1/ocr", params={"name": "synthetic.pdf"}, content=source)
+            assert result.raise_for_status().json() == {"id": file_id, "pages": [page], "approved": False}
+        assert calls == [source]
+        with app.state.db.connect() as conn:
+            assert conn.execute(store.import_rows.select()).one().id == page_id
+        assert client.get("/api/org/1/data/lines").raise_for_status().json() == []
+    finally:
+        client.close()
+        app.state.db.dispose()
+
+
+def test_ocr_region_uses_continuation_evidence_page(tmp_path, monkeypatch):
+    client, app = client_for(tmp_path / "ocr-region.db")
+    box = [0.2, 0.3, 0.4, 0.5]
+    try:
+        client.post("/api/organizations", params={"name": "OCR 원본 위치 검증"}).raise_for_status()
+        with app.state.db.begin() as conn:
+            file_id = conn.execute(store.import_files.insert().values(
+                org=1, kind="pdf", name="synthetic.pdf", sha="synthetic", data=b"fixture",
+            )).inserted_primary_key[0]
+            conn.execute(store.import_rows.insert().values(
+                file=file_id, sheet="PDF", row=1, original={"evidence": [{"usd": {"box": box, "page": 2}}]},
+            ))
+        monkeypatch.setattr(ocr, "recognize_region", lambda _, page, bounds: {"page": page, "box": bounds})
+        result = client.post(f"/api/org/1/ocr/{file_id}/page/1/region", params={"row": 0, "field": "usd"})
+        assert result.raise_for_status().json() == {"page": 2, "box": box}
+    finally:
+        client.close()
+        app.state.db.dispose()
+
+
+def test_ocr_profile_drafts_are_scoped_and_require_preview(tmp_path):
+    client, app = client_for(tmp_path / "ocr-profile.db")
+    try:
+        client.post("/api/organizations", params={"name": "첫 품목"}).raise_for_status()
+        with app.state.db.begin() as conn:
+            conn.execute(store.organizations.insert().values(id=2, name="이전 스키마의 두 번째 품목"))
+        route = "/api/org/1/ocr/profiles"
+        config = {"name": "시험 템플릿", "variant": "preloading-cover",
+                  "regions": [{"field": "declared", "anchor": "신고일자", "box": [-.02, .01, .1, .03],
+                               "format": "date-separated"}]}
+        version = client.post(route, json=config).raise_for_status().json()["id"]
+        assert client.post(f"{route}/{version}/activate").status_code == 409
+        assert client.get("/api/org/2/ocr/profiles").raise_for_status().json() == []
+        assert client.post(route, content=b" " * 8193).status_code == 413
+        config["regions"][0]["regex"] = "(a+)+"
+        assert client.post(route, json=config).status_code == 422
+        assert len(client.get(route).raise_for_status().json()) == 1
+    finally:
+        client.close()
+        app.state.db.dispose()
+
+
 def test_ocr_approval_checks_active_declaration_lines(tmp_path):
     client, app = client_for(tmp_path / "ocr-registration.db")
     base = "/api/org/1"
@@ -278,7 +353,13 @@ def test_ocr_approval_checks_active_declaration_lines(tmp_path):
         unverified = client.post(url, json=[reviewed | {"verified_usd": ""}])
         assert unverified.status_code == 422
         assert [p["code"] for p in unverified.json()["issues"]] == ["P040"]
+        duplicate = client.post(url, json=[reviewed, reviewed | {"values": values | {"line": "001"}}])
+        assert duplicate.status_code == 422
+        assert {(p["code"], p["position"]) for p in duplicate.json()["issues"]} == {("D080", 2)}
+        assert len(client.get(path).raise_for_status().json()) == 2
         corrected = reviewed | {"values": values | {"line": "2", "version": "2"}}
+        assert client.post(url, params={"validate_only": True}, json=[reviewed, corrected]).raise_for_status().json() == {"valid": True}
+        assert len(client.get(path).raise_for_status().json()) == 2
         assert client.post(url, json=[reviewed, corrected]).raise_for_status().json() == {"imported": 2, "needs_review": 1}
         assert len(client.get(path).raise_for_status().json()) == 4
         checks = client.get(base + "/line-checks").raise_for_status().json()

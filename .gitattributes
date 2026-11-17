@@ -1,0 +1,5 @@
+licenses/** -text
+requirements.txt -text
+requirements-dev.txt -text
+package-lock.json -text
+epms/ocr_unipass.json -text

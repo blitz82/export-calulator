@@ -381,7 +381,8 @@ function Help() {
     <li><NavLink to="/lines">신고 원장</NavLink>에 신고필증을 등록합니다. 한 신고에 품목란이 여러 개이거나 정정 신고라면 해당 항목을 펼쳐 원본 값을 확인하세요.</li>
     <li><NavLink to="/submission">제출자료</NavLink>에서 실적 연도를 선택하고 현재 자료를 검토합니다. 보완할 건을 수정하고 회원사별 실적을 확인한 뒤 제출용 Excel을 확정합니다.</li>
   </ol><h2>인정 기준</h2><p>대행자와 화주는 직접수출 자격, 제조자는 간접수출 자격을 가집니다. 같은 사업자가 두 자격을 갖는 경우 직접수출을 한 번 인정합니다.</p>
-  <p>동일 신고 품목란의 실제 수출액은 한 번 집계합니다. 서로 다른 회원사에는 해당 역할에 따른 실적이 각각 귀속됩니다.</p></section>
+  <p>동일 신고 품목란의 실제 수출액은 한 번 집계합니다. 서로 다른 회원사에는 해당 역할에 따른 실적이 각각 귀속됩니다.</p>
+  <p><a href="/oss/index.html" target="_blank" rel="noreferrer">오픈소스 소프트웨어 정보</a></p></section>
 }
 
 function MenuLink({item:[path,label,description]}: {item:typeof menus[number]}) {

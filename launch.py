@@ -1,5 +1,6 @@
 import argparse
 import ctypes
+import hashlib
 import logging
 import os
 import socket
@@ -44,6 +45,32 @@ def show_webview2_download():
         os.startfile(WEBVIEW2_DOWNLOAD)
 
 
+def accept_fixed_runtime_terms(package_root):
+    terms = package_root / "licenses" / "runtime" / "WebView2-Fixed-Version-LICENSE.html"
+    if not terms.is_file():
+        raise RuntimeError("무설치판의 WebView2 사용 약관 파일을 찾을 수 없습니다.")
+    digest = hashlib.sha256(terms.read_bytes()).hexdigest()
+    consent = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "EPMS" / f"webview2-terms-{digest}.accepted"
+    if consent.is_file():
+        return True
+    message = (
+        "무설치판에 포함된 Microsoft Edge WebView2 Runtime (Fixed Version) 약관을 확인하세요.\n\n"
+        "Microsoft Defender SmartScreen은 Microsoft 개인정보처리방침에 따라 "
+        "최종 사용자의 정보를 Microsoft에 보내고 처리할 수 있습니다.\n\n"
+        "예: 약관에 동의하고 실행 · 아니요: 약관 전문 열기 · 취소: 종료"
+    )
+    while True:
+        choice = ctypes.windll.user32.MessageBoxW(None, message, "Microsoft WebView2 사용 약관", 0x223)
+        if choice == 7:
+            os.startfile(terms)
+            continue
+        if choice != 6:
+            return False
+        consent.parent.mkdir(parents=True, exist_ok=True)
+        consent.touch()
+        return True
+
+
 def desktop(app, server, listener, port):
     import webview
 
@@ -51,6 +78,8 @@ def desktop(app, server, listener, port):
     runtime = (Path(sys.executable).parent / "WebView2" if packaged
                else Path(__file__).resolve().parent / "build" / "WebView2")
     fixed_runtime = (runtime / "msedgewebview2.exe").is_file()
+    if packaged and fixed_runtime and not accept_fixed_runtime_terms(runtime.parent):
+        return
     if fixed_runtime and sys.getwindowsversion().build < 22000:
         # Fixed WebView2 on Windows 10 runs its renderer in an AppContainer.
         result = subprocess.run(

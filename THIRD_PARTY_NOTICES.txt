@@ -1,0 +1,162 @@
+EPMS Third-Party Notices
+
+Inventory from local build inputs. Review pending.
+Windows OCR and Windows PowerShell are provided by the operating system.
+
+@tanstack/query-core 5.107.1 | MIT
+  licenses/javascript/@tanstack/query-core/5.107.1/LICENSE
+@tanstack/react-query 5.107.1 | MIT
+  licenses/javascript/@tanstack/react-query/5.107.1/LICENSE
+@types/react 19.3.0 | MIT
+  licenses/javascript/@types/react/19.3.0/LICENSE
+CPython 3.12.14 | PSF-2.0
+  licenses/runtime/Python-LICENSE.txt
+Mako 1.4.3 | MIT
+  licenses/python/mako/licenses/LICENSE
+MarkupSafe 3.0.4 | BSD-3-Clause
+  licenses/python/markupsafe/licenses/LICENSE.txt
+SQLAlchemy 2.1.8 | MIT
+  licenses/python/sqlalchemy/licenses/AUTHORS
+  licenses/python/sqlalchemy/licenses/LICENSE
+ag-charts-types 14.3.0 | MIT
+  licenses/javascript/ag-charts-types/14.3.0/LICENSE.txt
+ag-grid-community 36.3.0 | MIT
+  licenses/javascript/ag-grid-community/36.3.0/LICENSE.txt
+ag-grid-react 36.3.0 | MIT
+  licenses/javascript/ag-grid-react/36.3.0/LICENSE.txt
+ag-stack 36.3.0 | MIT
+  licenses/javascript/ag-stack/36.3.0/LICENSE.txt
+alembic 1.20.1 | MIT
+  licenses/python/alembic/licenses/LICENSE
+altgraph 0.17.5 | license identifier pending
+  licenses/python/altgraph/LICENSE
+annotated-doc 0.0.6 | MIT
+  licenses/python/annotated-doc/licenses/LICENSE
+annotated-types 0.8.0 | MIT
+  licenses/python/annotated-types/licenses/LICENSE
+anyio 4.16.0 | MIT
+  licenses/python/anyio/licenses/LICENSE
+bottle 0.13.4 | license identifier pending
+  licenses/python/bottle/licenses/LICENSE
+cffi 2.1.1 | MIT-0
+  licenses/python/cffi/licenses/LICENSE
+click 8.5.1 | BSD-3-Clause
+  licenses/python/click/licenses/LICENSE.txt
+clr_loader 0.3.1 | license identifier pending
+  licenses/python/clr-loader/licenses/LICENSE
+cookie 1.1.1 | MIT
+  licenses/javascript/cookie/1.1.1/LICENSE
+csstype 3.2.3 | MIT
+  licenses/javascript/csstype/3.2.3/LICENSE
+et_xmlfile 2.0.0 | license identifier pending
+  licenses/python/et-xmlfile/LICENCE.python
+  licenses/python/et-xmlfile/LICENCE.rst
+fastapi 0.162.5 | MIT
+  licenses/python/fastapi/licenses/LICENSE
+h11 0.16.0 | license identifier pending
+  licenses/python/h11/licenses/LICENSE.txt
+idna 3.20 | BSD-3-Clause
+  licenses/python/idna/licenses/LICENSE.md
+js-tokens 4.0.0 | MIT
+  licenses/javascript/js-tokens/4.0.0/LICENSE
+loose-envify 1.4.0 | MIT
+  licenses/javascript/loose-envify/1.4.0/LICENSE
+object-assign 4.1.1 | MIT
+  licenses/javascript/object-assign/4.1.1/license
+openpyxl 3.1.5 | license identifier pending
+  licenses/python/openpyxl/LICENCE.rst
+opentelemetry-api 1.45.2 | Apache-2.0
+  licenses/python/opentelemetry-api/licenses/LICENSE
+packaging 26.3 | Apache-2.0 OR BSD-2-Clause
+  licenses/python/packaging/licenses/LICENSE
+  licenses/python/packaging/licenses/LICENSE.APACHE
+  licenses/python/packaging/licenses/LICENSE.BSD
+pefile 2024.8.26 | license identifier pending
+  licenses/python/pefile/LICENSE
+pillow 13.0.0 | MIT-CMU
+  licenses/python/pillow/licenses/LICENSE
+prop-types 15.8.1 | MIT
+  licenses/javascript/prop-types/15.8.1/LICENSE
+proxy_tools 0.1.0 | BSD-2-Clause
+  licenses/python/proxy-tools/0.1.0/LICENSE.txt
+pycparser 3.12 | BSD-3-Clause
+  licenses/python/pycparser/licenses/LICENSE
+pydantic 2.14.3 | MIT
+  licenses/python/pydantic/licenses/LICENSE
+pydantic_core 2.50.4 | MIT
+  licenses/python/pydantic-core/licenses/LICENSE
+pyinstaller 6.22.3 | license identifier pending
+  licenses/python/pyinstaller/licenses/COPYING.txt
+pyinstaller-hooks-contrib 2026.10 | license identifier pending
+  licenses/python/pyinstaller-hooks-contrib/licenses/LICENSE
+pypdfium2 5.13.0 | license identifier pending
+  licenses/python/pypdfium2/licenses/LICENSES/Apache-2.0.txt
+  licenses/python/pypdfium2/licenses/LICENSES/BSD-3-Clause.txt
+  licenses/python/pypdfium2/licenses/LICENSES/CC-BY-4.0.txt
+  licenses/python/pypdfium2/licenses/data/windows_x64/BUILD_LICENSES/abseil.txt
+  licenses/python/pypdfium2/licenses/data/windows_x64/BUILD_LICENSES/agg23.txt
+  licenses/python/pypdfium2/licenses/data/windows_x64/BUILD_LICENSES/fast_float.txt
+  licenses/python/pypdfium2/licenses/data/windows_x64/BUILD_LICENSES/freetype.txt
+  licenses/python/pypdfium2/licenses/data/windows_x64/BUILD_LICENSES/icu.txt
+  licenses/python/pypdfium2/licenses/data/windows_x64/BUILD_LICENSES/lcms.txt
+  licenses/python/pypdfium2/licenses/data/windows_x64/BUILD_LICENSES/libjpeg_turbo.ijg
+  licenses/python/pypdfium2/licenses/data/windows_x64/BUILD_LICENSES/libjpeg_turbo.md
+  licenses/python/pypdfium2/licenses/data/windows_x64/BUILD_LICENSES/libopenjpeg.txt
+  licenses/python/pypdfium2/licenses/data/windows_x64/BUILD_LICENSES/libpng.txt
+  licenses/python/pypdfium2/licenses/data/windows_x64/BUILD_LICENSES/libtiff.txt
+  licenses/python/pypdfium2/licenses/data/windows_x64/BUILD_LICENSES/llvm-libc.txt
+  licenses/python/pypdfium2/licenses/data/windows_x64/BUILD_LICENSES/pdfium-binaries.txt
+  licenses/python/pypdfium2/licenses/data/windows_x64/BUILD_LICENSES/pdfium.txt
+  licenses/python/pypdfium2/licenses/data/windows_x64/BUILD_LICENSES/simdutf.txt
+  licenses/python/pypdfium2/licenses/data/windows_x64/BUILD_LICENSES/zlib.txt
+pythonnet 3.2.1 | MIT
+  licenses/python/pythonnet/licenses/AUTHORS.md
+  licenses/python/pythonnet/licenses/LICENSE
+pywebview 6.2.1 | license identifier pending
+  licenses/python/pywebview/licenses/LICENSE
+pywin32-ctypes 0.2.3 | license identifier pending
+  licenses/python/pywin32-ctypes/LICENSE.txt
+react 19.3.1 | MIT
+  licenses/javascript/react/19.3.1/LICENSE
+react-dom 19.3.1 | MIT
+  licenses/javascript/react-dom/19.3.1/LICENSE
+react-is 16.13.1 | MIT
+  licenses/javascript/react-is/16.13.1/LICENSE
+react-router 7.18.5 | MIT
+  licenses/javascript/react-router/7.18.5/LICENSE.md
+react-router-dom 7.18.5 | MIT
+  licenses/javascript/react-router-dom/7.18.5/LICENSE.md
+scheduler 0.28.0 | MIT
+  licenses/javascript/scheduler/0.28.0/LICENSE
+set-cookie-parser 2.7.3 | MIT
+  licenses/javascript/set-cookie-parser/2.7.3/LICENSE
+setuptools 84.2.1 | MIT
+  licenses/python/setuptools/licenses/LICENSE
+starlette 1.10.0 | BSD-3-Clause
+  licenses/python/starlette/licenses/LICENSE.md
+typing-inspection 0.4.5 | MIT
+  licenses/python/typing-inspection/licenses/LICENSE
+typing_extensions 4.16.0 | PSF-2.0
+  licenses/python/typing-extensions/licenses/LICENSE
+tzdata 2026.6 | license identifier pending
+  licenses/python/tzdata/licenses/LICENSE
+  licenses/python/tzdata/licenses/licenses/LICENSE_APACHE
+uvicorn 0.54.0 | BSD-3-Clause
+  licenses/python/uvicorn/licenses/LICENSE.md
+PDFium 153.0.7999.0 | license identifier pending
+  licenses/python/pypdfium2/licenses/data/windows_x64/BUILD_LICENSES/abseil.txt
+  licenses/python/pypdfium2/licenses/data/windows_x64/BUILD_LICENSES/agg23.txt
+  licenses/python/pypdfium2/licenses/data/windows_x64/BUILD_LICENSES/fast_float.txt
+  licenses/python/pypdfium2/licenses/data/windows_x64/BUILD_LICENSES/freetype.txt
+  licenses/python/pypdfium2/licenses/data/windows_x64/BUILD_LICENSES/icu.txt
+  licenses/python/pypdfium2/licenses/data/windows_x64/BUILD_LICENSES/lcms.txt
+  licenses/python/pypdfium2/licenses/data/windows_x64/BUILD_LICENSES/libjpeg_turbo.ijg
+  licenses/python/pypdfium2/licenses/data/windows_x64/BUILD_LICENSES/libjpeg_turbo.md
+  licenses/python/pypdfium2/licenses/data/windows_x64/BUILD_LICENSES/libopenjpeg.txt
+  licenses/python/pypdfium2/licenses/data/windows_x64/BUILD_LICENSES/libpng.txt
+  licenses/python/pypdfium2/licenses/data/windows_x64/BUILD_LICENSES/libtiff.txt
+  licenses/python/pypdfium2/licenses/data/windows_x64/BUILD_LICENSES/llvm-libc.txt
+  licenses/python/pypdfium2/licenses/data/windows_x64/BUILD_LICENSES/pdfium-binaries.txt
+  licenses/python/pypdfium2/licenses/data/windows_x64/BUILD_LICENSES/pdfium.txt
+  licenses/python/pypdfium2/licenses/data/windows_x64/BUILD_LICENSES/simdutf.txt
+  licenses/python/pypdfium2/licenses/data/windows_x64/BUILD_LICENSES/zlib.txt

@@ -1,7 +1,9 @@
 import json
 import os
 import secrets
+import sys
 from collections import defaultdict
+from contextlib import closing
 from io import BytesIO
 from pathlib import Path
 from urllib.parse import quote
@@ -17,7 +19,7 @@ from sqlalchemy import func, select
 from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.exc import IntegrityError
 
-from epms import books, ocr, rules, store, submission
+from epms import books, ocr, ocr_profiles, rules, store, submission
 
 ROOT = Path(__file__).resolve().parents[1]
 FIELDS = {"members": books.MEMBER, "lines": books.LINE}
@@ -54,6 +56,10 @@ class OcrRow(BaseModel):
     values: dict[str, str] = Field(max_length=50)
     verified_usd: str = Field(max_length=100)
     verified_kg: str = Field(max_length=100)
+
+
+class OcrSelection(BaseModel):
+    box: tuple[float, float, float, float]
 
 
 def fail(message, status=400):
@@ -480,22 +486,47 @@ def create_app(path=None):
         sha = books.digest(data)
         files = store.import_files
         query = select(files.c.id).where(files.c.org == org, files.c.sha == sha, files.c.kind == "pdf")
+
+        def cached(conn, file_id):
+            originals = [row["original"] for row in ocr_pages(conn, file_id)]
+            approved = ocr_approved(conn, file_id)
+            if approved or (originals and all(page.get("extractor_version") == ocr.EXTRACTION_VERSION
+                                              and page.get("profile_id") == profile_id for page in originals)):
+                return dict(id=file_id, pages=originals, approved=approved)
+            return None
+
         with db.connect() as conn:
             organization(conn, org)
+            profiles = store.ocr_profiles
+            profile = conn.execute(profiles.select().where(profiles.c.org == org, profiles.c.active == 1)).first()
+            profile_id = profile.id if profile else None
             file_id = conn.execute(query).scalar()
-            if file_id is not None:
-                return dict(id=file_id, pages=[row["original"] for row in ocr_pages(conn, file_id)],
-                            approved=ocr_approved(conn, file_id))
+            if file_id is not None and (previous := cached(conn, file_id)):
+                return previous
         try:
             pages = ocr.extract(data)
+            if profile:
+                ocr_profiles.apply(data, pages, ocr_profiles.Profile.model_validate(profile.data))
+                for page in pages:
+                    page["profile_id"] = profile_id
         except ImportError:
             fail("PDF 처리 구성 요소를 설치한 뒤 다시 시도하세요.", 503)
         except ValueError as error:
             fail(str(error))
         with db.begin() as conn:
             conn.exec_driver_sql("BEGIN IMMEDIATE")
+            active_profile = conn.execute(select(profiles.c.id).where(profiles.c.org == org, profiles.c.active == 1)).scalar()
+            if profile_id != active_profile:
+                fail("OCR 템플릿이 변경됐습니다. PDF를 다시 올려 주세요.", 409)
             file_id = conn.execute(query).scalar()
-            if file_id is None:
+            if file_id is not None:
+                if previous := cached(conn, file_id):
+                    return previous
+                sources = store.import_rows
+                for page in pages:
+                    conn.execute(sources.update().where(sources.c.file == file_id, sources.c.row == page["page"])
+                                 .values(original=page))
+            else:
                 file_id = conn.execute(files.insert().values(org=org, sha=sha, kind="pdf", name=name,
                                                             data=data)).inserted_primary_key[0]
                 conn.execute(store.import_rows.insert(), [
@@ -520,13 +551,109 @@ def create_app(path=None):
         return await run_in_threadpool(extract_ocr, org, name, bytes(payload), actor(request))
 
     @app.get(ocr_path + "/{file_id}/page/{page}")
-    def preview_ocr_page(org: int, file_id: int, page: int):
+    def preview_ocr_page(org: int, file_id: int, page: int, rotation: int = 0):
+        if rotation not in {0, 90, 180, 270}:
+            fail("회전 각도를 확인하세요.")
         with db.connect() as conn:
             data = ocr_file(conn, org, file_id)["data"]
         try:
-            return Response(ocr.page_image(data, page), media_type="image/png")
+            return Response(ocr.page_image(data, page, rotation=rotation), media_type="image/png")
         except ValueError as error:
             fail(str(error))
+
+    @app.post(ocr_path + "/{file_id}/page/{page}/region")
+    def recheck_ocr_region(org: int, file_id: int, page: int, row: int, field: str):
+        with db.connect() as conn:
+            data = ocr_file(conn, org, file_id)["data"]
+            source = next((record["original"] for record in ocr_pages(conn, file_id) if record["row"] == page), {})
+        evidence = source.get("evidence", [])
+        location = evidence[row].get(field, {}) if 0 <= row < len(evidence) else {}
+        box = location.get("box")
+        if not box:
+            fail("이 항목에 저장된 원본 영역이 없습니다.", 404)
+        return ocr.recognize_region(data, location.get("page", page), box)
+
+    @app.post(ocr_path + "/{file_id}/page/{page}/selection")
+    def recheck_ocr_selection(org: int, file_id: int, page: int, selection: OcrSelection):
+        x0, y0, x1, y1 = selection.box
+        if not (0 <= x0 < x1 <= 1 and 0 <= y0 < y1 <= 1 and x1 - x0 >= .002 and y1 - y0 >= .002):
+            fail("원본에서 인식할 영역을 다시 지정하세요.")
+        with db.connect() as conn:
+            data = ocr_file(conn, org, file_id)["data"]
+        try:
+            return ocr.recognize_region(data, page, selection.box)
+        except ValueError as error:
+            fail(str(error))
+
+    profile_table = store.ocr_profiles
+    profile_path = ocr_path + "/profiles"
+
+    @app.get(profile_path)
+    def list_ocr_profiles(org: int):
+        with db.connect() as conn:
+            organization(conn, org)
+            return [dict(row) for row in conn.execute(profile_table.select().where(profile_table.c.org == org)
+                                                     .order_by(profile_table.c.id.desc())).mappings()]
+
+    @app.post(profile_path)
+    async def save_ocr_profile(org: int, request: Request):
+        from pydantic import ValidationError
+        from starlette.concurrency import run_in_threadpool
+
+        payload = bytearray()
+        async for chunk in request.stream():
+            if len(payload) + len(chunk) > 8192:
+                fail("템플릿 JSON은 8KB 이하여야 합니다.", 413)
+            payload.extend(chunk)
+        try:
+            profile = ocr_profiles.Profile.model_validate_json(payload)
+        except ValidationError:
+            fail("템플릿 이름, 지원 서식 및 필드 영역 JSON을 확인하세요.", 422)
+        return await run_in_threadpool(persist_ocr_profile, org, profile, actor(request))
+
+    def persist_ocr_profile(org, profile, user):
+        with db.begin() as conn:
+            organization(conn, org)
+            version = conn.execute(profile_table.insert().values(
+                org=org, data=profile.model_dump(mode="json"), validated=0, active=0)).inserted_primary_key[0]
+            store.log(conn, org, user, "OCR 템플릿", version, "버전 저장", None, None)
+        return {"id": version}
+
+    @app.post(profile_path + "/{version}/preview")
+    def preview_ocr_profile(org: int, version: int, file_id: int, page: int):
+        key = (profile_table.c.org == org) & (profile_table.c.id == version)
+        with db.connect() as conn:
+            data = ocr_file(conn, org, file_id)["data"]
+            config = conn.execute(select(profile_table.c.data).where(key)).scalar()
+        if config is None:
+            fail("템플릿 버전을 찾을 수 없습니다.", 404)
+        profile = ocr_profiles.Profile.model_validate(config)
+        with ocr.PDF_LOCK, ocr.open_pdf(data) as document:
+            if not 1 <= page <= len(document):
+                fail("원본 쪽 번호를 확인하세요.")
+            with closing(document[page - 1]) as pdf_page:
+                _, rows = ocr.read_pdf_page(pdf_page)
+                candidates = ocr_profiles.preview(pdf_page, profile) if len(rows) == 1 else {}
+        passed = len(candidates) == len(profile.regions)
+        if passed:
+            with db.begin() as conn:
+                conn.execute(profile_table.update().where(key).values(validated=1))
+        return {"candidates": candidates, "passed": passed}
+
+    @app.post(profile_path + "/{version}/activate")
+    def activate_ocr_profile(org: int, version: int, request: Request):
+        with db.begin() as conn:
+            conn.exec_driver_sql("BEGIN IMMEDIATE")
+            organization(conn, org)
+            group = profile_table.c.org == org
+            chosen = group & (profile_table.c.id == version)
+            if version and not conn.execute(select(profile_table.c.validated).where(chosen)).scalar():
+                fail("추출 미리보기를 통과한 버전만 활성화할 수 있습니다.", 409)
+            conn.execute(profile_table.update().where(group).values(active=0))
+            if version:
+                conn.execute(profile_table.update().where(chosen).values(active=1))
+            store.log(conn, org, actor(request), "OCR 템플릿", version, "활성 버전 변경", None, None)
+        return {"active": version}
 
     @app.get(ocr_path + "/{file_id}/original")
     def original_pdf(org: int, file_id: int):
@@ -551,7 +678,7 @@ def create_app(path=None):
             return pages
 
     @app.post(ocr_path + "/{file_id}/approve")
-    def approve_ocr(org: int, file_id: int, reviewed: list[OcrRow], request: Request):
+    def approve_ocr(org: int, file_id: int, reviewed: list[OcrRow], request: Request, validate_only: bool = False):
         if not 1 <= len(reviewed) <= 300:
             fail("한 PDF에서 1~300개 품목란을 승인할 수 있습니다.")
         with db.begin() as conn:
@@ -563,6 +690,7 @@ def create_app(path=None):
             index = member_index(conn, org)
             errors = []
             validated = []
+            submitted = {}
             for position, row in enumerate(reviewed, 1):
                 if row.page not in pages:
                     fail("PDF 원본 쪽을 확인하세요.")
@@ -570,6 +698,12 @@ def create_app(path=None):
                 if any(len(value) > 4000 for value in values.values()):
                     fail("셀 입력값은 4,000자 이하여야 합니다.")
                 problems = rules.validate_line(values, index)[0]
+                key = rules.active_declaration_key(values)
+                if key is not None:
+                    identity = key, rules.declaration_version(values)
+                    first = submitted.setdefault(identity, position)
+                    if first != position:
+                        problems.append(rules.issue("D080", "line", f"같은 신고번호·품목란·정정 버전이 검토 {first}행에 있습니다."))
                 for key, confirmed in (("usd", row.verified_usd), ("kg", row.verified_kg)):
                     value = values.get(key, "")
                     if not value or rules.decimal(value) is None or value != rules.clean(confirmed):
@@ -580,6 +714,8 @@ def create_app(path=None):
                 validated.append((row.page, values))
             if errors:
                 return JSONResponse({"issues": errors}, status_code=422)
+            if validate_only:
+                return {"valid": True}
             user = actor(request)
             declarations = declaration_index(store.records(conn, store.declarations, org))
             imported_ids, review_ids = set(), set()
@@ -931,6 +1067,9 @@ def create_app(path=None):
                           "2027년 제출양식 확정", None, {"first": first_id, "second": second_id})
             return download(data, f"공동정산_{name}_{'최종확정본' if final else '검증미완료'}.xlsx")
 
+    license_root = (Path(sys.executable).parent if getattr(sys, "frozen", False) else ROOT) / "licenses"
+    if license_root.is_dir():
+        app.mount("/oss", StaticFiles(directory=license_root, html=True), name="licenses")
     assets = ROOT / "dist"
     if assets.is_dir():
         app.mount("/", StaticFiles(directory=assets, html=True), name="frontend")

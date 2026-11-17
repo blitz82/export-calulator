@@ -230,6 +230,23 @@ aside :is(button,summary,a):focus-visible { outline-color:#e5f0e8; }
 .ocr-panels section { min-width: 0; }
 .ocr-page { height: min(65vh, 760px); overflow: auto; border: 1px solid #ccc; background: #eee; }
 .ocr-page img { display: block; max-width: none; }
+.ocr-image { position: relative; }
+.ocr-image img { width: 100%; }
+.ocr-selecting { cursor: crosshair; touch-action: none; }
+.ocr-selected-box { position: absolute; pointer-events: none; border: 2px dashed #8d5003; background: #ffd45440; }
+.ocr-location {
+  position: absolute;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 1px solid #1681aa;
+  border-radius: 0;
+  background: #1681aa18;
+}
+.ocr-location-active, .ocr-location:focus-visible {
+  outline: 2px solid #8d5003;
+  background: #ffd45466;
+}
 .stored-pdf-dialog { width: min(900px, 96vw); }
 .stored-pdf-dialog .ocr-page img { width: 100%; }
 .ocr-page p { padding: 12px; }

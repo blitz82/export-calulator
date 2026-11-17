@@ -30,6 +30,10 @@ import_rows = Table("import_rows", metadata, Column("id", Integer, primary_key=T
                     Column("file", ForeignKey("import_files.id"), nullable=False),
                     Column("sheet", String, nullable=False), Column("row", Integer, nullable=False),
                     Column("original", JSON, nullable=False))
+ocr_profiles = Table("ocr_profiles", metadata, Column("id", Integer, primary_key=True),
+                     Column("org", ForeignKey("organizations.id"), nullable=False),
+                     Column("data", JSON, nullable=False), Column("validated", Integer, nullable=False),
+                     Column("active", Integer, nullable=False))
 declarations = Table("declaration_lines", metadata, Column("id", Integer, primary_key=True),
                      Column("org", ForeignKey("organizations.id"), nullable=False),
                      Column("revision", Integer, nullable=False),

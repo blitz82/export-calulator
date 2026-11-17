@@ -1,12 +1,15 @@
-﻿param([string]$Python = "python", [string]$WebViewRuntime = "build/WebView2", [switch]$Lite)
+﻿param([string]$Python = "python", [string]$WebViewRuntime = "build/WebView2", [switch]$Lite,
+      [string]$OutputRoot = "release", [switch]$Preflight)
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 $appName = "공동정산 수출실적 관리"
-$distPath = "release/desktop"
+$distPath = Join-Path $OutputRoot "desktop"
+$variant = "portable"
 $zipSuffix = "Portable"
 $guide = "docs/WINDOWS_PORTABLE.txt"
 if ($Lite) {
-    $distPath = "release/lite-desktop"
+    $distPath = Join-Path $OutputRoot "lite-desktop"
+    $variant = "lite"
     $zipSuffix = "Lite"
     $guide = "docs/WINDOWS_LITE.txt"
 } else {
@@ -20,15 +23,33 @@ if ($Lite) {
 }
 & $Python -c "import webview; import clr; import webview.platforms.winforms"
 if ($LASTEXITCODE -ne 0) { throw "데스크톱 빌드 의존성을 불러올 수 없습니다. 지정한 Python 환경에 requirements-dev.txt를 설치하세요." }
+Get-Command npm.cmd -ErrorAction Stop | Out-Null
+& $Python -m epms.packaging_checks $variant --webview $WebViewRuntime
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+if ($Preflight) { return }
 npm.cmd run build
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 & $Python -m epms.prepare_template
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-& $Python -m PyInstaller --noconfirm --clean --distpath $distPath EPMS.spec
+& $Python -m PyInstaller --noconfirm --clean --workpath (Join-Path $OutputRoot "work/$variant") --distpath $distPath EPMS.spec
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 if (!$Lite) {
     Copy-Item -LiteralPath $runtime -Destination "$distPath/$appName/WebView2" -Recurse
 }
 Copy-Item -LiteralPath $guide -Destination "$distPath/$appName/실행 안내.txt"
-& $Python -m zipfile -c "release/$appName-Windows-x64-$zipSuffix.zip" "$distPath/$appName"
+$packageDir = Join-Path $distPath $appName
+Copy-Item -LiteralPath "docs/OCR_REVIEW_WORKFLOW.md" -Destination "$packageDir/OCR 안내.md"
+Copy-Item -LiteralPath "docs/OPEN_SOURCE_COMPLIANCE.md" -Destination "$distPath/$appName/오픈소스 검토 안내.md"
+Copy-Item -LiteralPath "docs/OCR_RELEASE_NOTES.md" -Destination "$packageDir/RELEASE_NOTES.md"
+& $Python -m epms.packaging_checks $variant --webview $WebViewRuntime --output (Join-Path $packageDir "build-info.json")
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+& $Python -m epms.oss_inventory "$distPath/$appName" $variant --analysis (Join-Path $OutputRoot "work/$variant/EPMS/Analysis-00.toc")
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+$version = (Get-Content -LiteralPath package.json -Raw -Encoding UTF8 | ConvertFrom-Json).version
+if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "package.json의 릴리스 버전을 확인하세요." }
+$zip = Join-Path $OutputRoot "EPMS-Windows-x64-$zipSuffix-v$version.zip"
+& $Python -m zipfile -c $zip "$distPath/$appName"
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+(Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant() | Set-Content -Encoding ascii "$zip.sha256"
+& $Python -m epms.supply_chain verify-zip $zip $variant (Join-Path $packageDir "sbom/epms-$variant.cdx.json") --require-build-info
 exit $LASTEXITCODE

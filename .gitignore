@@ -14,7 +14,4 @@ test-results/
 *.db-shm
 *.spec
 !EPMS.spec
-/samples/*.xlsx
-!/samples/2027-공식양식.xlsx
-/data/
-.env*
+/samples/**/*.pdf

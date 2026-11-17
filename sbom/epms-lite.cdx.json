@@ -1,0 +1,3148 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "version": 1,
+  "metadata": {
+    "component": {
+      "type": "application",
+      "name": "EPMS lite",
+      "bom-ref": "epms"
+    },
+    "properties": [
+      {
+        "name": "epms:inventory-scope",
+        "value": "build inputs and packaged file hashes"
+      },
+      {
+        "name": "epms:sha256:requirements.txt",
+        "value": "3acbbe15fd073521f5554ac8e54122dbf061a0fa91e36007f479263dbd357ea3"
+      },
+      {
+        "name": "epms:sha256:requirements-dev.txt",
+        "value": "ab61b0ea64dd9574f20097c25ef9e8a924cd20eff4543dbae53b86f16c262588"
+      },
+      {
+        "name": "epms:sha256:package-lock.json",
+        "value": "087fa00426ed3e88106a4272d646eb972af2c9b00effad64a42aec0b6497adae"
+      },
+      {
+        "name": "epms:sha256:ocr_unipass.json",
+        "value": "fa272beb28f4fda4d517e649250f0ea6c5d7fc2287ef66ec266a9535d8ca71af"
+      }
+    ]
+  },
+  "components": [
+    {
+      "type": "library",
+      "name": "@tanstack/query-core",
+      "version": "5.107.1",
+      "bom-ref": "npm:node_modules/@tanstack/query-core",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:npm/%40tanstack/query-core@5.107.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "@tanstack/react-query",
+      "version": "5.107.1",
+      "bom-ref": "npm:node_modules/@tanstack/react-query",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:npm/%40tanstack/react-query@5.107.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "@types/react",
+      "version": "19.3.0",
+      "bom-ref": "npm:node_modules/@types/react",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:npm/%40types/react@19.3.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "CPython",
+      "version": "3.12.14",
+      "bom-ref": "runtime:cpython",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "supplier": {
+        "name": "Python Software Foundation"
+      },
+      "licenses": [
+        {
+          "license": {
+            "name": "PSF-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "Mako",
+      "version": "1.4.3",
+      "bom-ref": "pypi:mako",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:pypi/mako@1.4.3",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "MarkupSafe",
+      "version": "3.0.4",
+      "bom-ref": "pypi:markupsafe",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:pypi/markupsafe@3.0.4",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD-3-Clause"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "Pygments",
+      "version": "2.21.0",
+      "bom-ref": "pypi:pygments",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:pypi/pygments@2.21.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD-2-Clause"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "SQLAlchemy",
+      "version": "2.1.8",
+      "bom-ref": "pypi:sqlalchemy",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:pypi/sqlalchemy@2.1.8",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "ag-charts-types",
+      "version": "14.3.0",
+      "bom-ref": "npm:node_modules/ag-charts-types",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:npm/ag-charts-types@14.3.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "ag-grid-community",
+      "version": "36.3.0",
+      "bom-ref": "npm:node_modules/ag-grid-community",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:npm/ag-grid-community@36.3.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "ag-grid-react",
+      "version": "36.3.0",
+      "bom-ref": "npm:node_modules/ag-grid-react",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:npm/ag-grid-react@36.3.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "ag-stack",
+      "version": "36.3.0",
+      "bom-ref": "npm:node_modules/ag-stack",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:npm/ag-stack@36.3.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "alembic",
+      "version": "1.20.1",
+      "bom-ref": "pypi:alembic",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:pypi/alembic@1.20.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "altgraph",
+      "version": "0.17.5",
+      "bom-ref": "pypi:altgraph",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:pypi/altgraph@0.17.5"
+    },
+    {
+      "type": "library",
+      "name": "annotated-doc",
+      "version": "0.0.6",
+      "bom-ref": "pypi:annotated-doc",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:pypi/annotated-doc@0.0.6",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "annotated-types",
+      "version": "0.8.0",
+      "bom-ref": "pypi:annotated-types",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:pypi/annotated-types@0.8.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "anyio",
+      "version": "4.16.0",
+      "bom-ref": "pypi:anyio",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:pypi/anyio@4.16.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "bottle",
+      "version": "0.13.4",
+      "bom-ref": "pypi:bottle",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:pypi/bottle@0.13.4"
+    },
+    {
+      "type": "library",
+      "name": "cffi",
+      "version": "2.1.1",
+      "bom-ref": "pypi:cffi",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:pypi/cffi@2.1.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT-0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "charset-normalizer",
+      "version": "3.5.2",
+      "bom-ref": "pypi:charset-normalizer",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:pypi/charset-normalizer@3.5.2"
+    },
+    {
+      "type": "library",
+      "name": "click",
+      "version": "8.5.1",
+      "bom-ref": "pypi:click",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:pypi/click@8.5.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD-3-Clause"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "clr_loader",
+      "version": "0.3.1",
+      "bom-ref": "pypi:clr-loader",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:pypi/clr-loader@0.3.1"
+    },
+    {
+      "type": "library",
+      "name": "colorama",
+      "version": "0.4.6",
+      "bom-ref": "pypi:colorama",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:pypi/colorama@0.4.6"
+    },
+    {
+      "type": "library",
+      "name": "cookie",
+      "version": "1.1.1",
+      "bom-ref": "npm:node_modules/cookie",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:npm/cookie@1.1.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "cryptography",
+      "version": "50.0.2",
+      "bom-ref": "pypi:cryptography",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:pypi/cryptography@50.0.2",
+      "licenses": [
+        {
+          "license": {
+            "name": "Apache-2.0 OR BSD-3-Clause"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "csstype",
+      "version": "3.2.3",
+      "bom-ref": "npm:node_modules/csstype",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:npm/csstype@3.2.3",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "et_xmlfile",
+      "version": "2.0.0",
+      "bom-ref": "pypi:et-xmlfile",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:pypi/et-xmlfile@2.0.0"
+    },
+    {
+      "type": "library",
+      "name": "fastapi",
+      "version": "0.162.5",
+      "bom-ref": "pypi:fastapi",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:pypi/fastapi@0.162.5",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "h11",
+      "version": "0.16.0",
+      "bom-ref": "pypi:h11",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:pypi/h11@0.16.0"
+    },
+    {
+      "type": "library",
+      "name": "idna",
+      "version": "3.20",
+      "bom-ref": "pypi:idna",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:pypi/idna@3.20",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD-3-Clause"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "iniconfig",
+      "version": "2.3.1",
+      "bom-ref": "pypi:iniconfig",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:pypi/iniconfig@2.3.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "js-tokens",
+      "version": "4.0.0",
+      "bom-ref": "npm:node_modules/js-tokens",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:npm/js-tokens@4.0.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "loose-envify",
+      "version": "1.4.0",
+      "bom-ref": "npm:node_modules/loose-envify",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:npm/loose-envify@1.4.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "lxml",
+      "version": "6.1.1",
+      "bom-ref": "pypi:lxml",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:pypi/lxml@6.1.1"
+    },
+    {
+      "type": "library",
+      "name": "numpy",
+      "version": "2.3.5",
+      "bom-ref": "pypi:numpy",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:pypi/numpy@2.3.5"
+    },
+    {
+      "type": "library",
+      "name": "object-assign",
+      "version": "4.1.1",
+      "bom-ref": "npm:node_modules/object-assign",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:npm/object-assign@4.1.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "openpyxl",
+      "version": "3.1.5",
+      "bom-ref": "pypi:openpyxl",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:pypi/openpyxl@3.1.5"
+    },
+    {
+      "type": "library",
+      "name": "opentelemetry-api",
+      "version": "1.45.2",
+      "bom-ref": "pypi:opentelemetry-api",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:pypi/opentelemetry-api@1.45.2",
+      "licenses": [
+        {
+          "license": {
+            "name": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "packaging",
+      "version": "26.3",
+      "bom-ref": "pypi:packaging",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:pypi/packaging@26.3",
+      "licenses": [
+        {
+          "license": {
+            "name": "Apache-2.0 OR BSD-2-Clause"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "pefile",
+      "version": "2024.8.26",
+      "bom-ref": "pypi:pefile",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:pypi/pefile@2024.8.26"
+    },
+    {
+      "type": "library",
+      "name": "pillow",
+      "version": "13.0.0",
+      "bom-ref": "pypi:pillow",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:pypi/pillow@13.0.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT-CMU"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "pluggy",
+      "version": "1.7.0",
+      "bom-ref": "pypi:pluggy",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:pypi/pluggy@1.7.0"
+    },
+    {
+      "type": "library",
+      "name": "prop-types",
+      "version": "15.8.1",
+      "bom-ref": "npm:node_modules/prop-types",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:npm/prop-types@15.8.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "proxy_tools",
+      "version": "0.1.0",
+      "bom-ref": "pypi:proxy-tools",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:pypi/proxy-tools@0.1.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD-2-Clause"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "pycparser",
+      "version": "3.12",
+      "bom-ref": "pypi:pycparser",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:pypi/pycparser@3.12",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD-3-Clause"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "pydantic",
+      "version": "2.14.3",
+      "bom-ref": "pypi:pydantic",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:pypi/pydantic@2.14.3",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "pydantic_core",
+      "version": "2.50.4",
+      "bom-ref": "pypi:pydantic-core",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:pypi/pydantic-core@2.50.4",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "pyinstaller",
+      "version": "6.22.3",
+      "bom-ref": "pypi:pyinstaller",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:pypi/pyinstaller@6.22.3"
+    },
+    {
+      "type": "library",
+      "name": "pyinstaller-hooks-contrib",
+      "version": "2026.10",
+      "bom-ref": "pypi:pyinstaller-hooks-contrib",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:pypi/pyinstaller-hooks-contrib@2026.10"
+    },
+    {
+      "type": "library",
+      "name": "pypdfium2",
+      "version": "5.13.0",
+      "bom-ref": "pypi:pypdfium2",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:pypi/pypdfium2@5.13.0"
+    },
+    {
+      "type": "library",
+      "name": "pytest",
+      "version": "9.2.0",
+      "bom-ref": "pypi:pytest",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:pypi/pytest@9.2.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "pythonnet",
+      "version": "3.2.1",
+      "bom-ref": "pypi:pythonnet",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:pypi/pythonnet@3.2.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "pywebview",
+      "version": "6.2.1",
+      "bom-ref": "pypi:pywebview",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:pypi/pywebview@6.2.1"
+    },
+    {
+      "type": "library",
+      "name": "pywin32-ctypes",
+      "version": "0.2.3",
+      "bom-ref": "pypi:pywin32-ctypes",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:pypi/pywin32-ctypes@0.2.3"
+    },
+    {
+      "type": "library",
+      "name": "react",
+      "version": "19.3.1",
+      "bom-ref": "npm:node_modules/react",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:npm/react@19.3.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "react-dom",
+      "version": "19.3.1",
+      "bom-ref": "npm:node_modules/react-dom",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:npm/react-dom@19.3.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "react-is",
+      "version": "16.13.1",
+      "bom-ref": "npm:node_modules/react-is",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:npm/react-is@16.13.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "react-router",
+      "version": "7.18.5",
+      "bom-ref": "npm:node_modules/react-router",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:npm/react-router@7.18.5",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "react-router-dom",
+      "version": "7.18.5",
+      "bom-ref": "npm:node_modules/react-router-dom",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:npm/react-router-dom@7.18.5",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "scheduler",
+      "version": "0.28.0",
+      "bom-ref": "npm:node_modules/scheduler",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:npm/scheduler@0.28.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "set-cookie-parser",
+      "version": "2.7.3",
+      "bom-ref": "npm:node_modules/set-cookie-parser",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:npm/set-cookie-parser@2.7.3",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "setuptools",
+      "version": "84.2.1",
+      "bom-ref": "pypi:setuptools",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:pypi/setuptools@84.2.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "starlette",
+      "version": "1.10.0",
+      "bom-ref": "pypi:starlette",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:pypi/starlette@1.10.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD-3-Clause"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "typing-inspection",
+      "version": "0.4.5",
+      "bom-ref": "pypi:typing-inspection",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:pypi/typing-inspection@0.4.5",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "typing_extensions",
+      "version": "4.16.0",
+      "bom-ref": "pypi:typing-extensions",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:pypi/typing-extensions@4.16.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "PSF-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "tzdata",
+      "version": "2026.6",
+      "bom-ref": "pypi:tzdata",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:pypi/tzdata@2026.6"
+    },
+    {
+      "type": "library",
+      "name": "uvicorn",
+      "version": "0.54.0",
+      "bom-ref": "pypi:uvicorn",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:pypi/uvicorn@0.54.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD-3-Clause"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "wheel",
+      "version": "0.48.0",
+      "bom-ref": "pypi:wheel",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:pypi/wheel@0.48.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "PDFium",
+      "version": "153.0.7999.0",
+      "bom-ref": "runtime:pdfium",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/PIL/_avif.cp312-win_amd64.pyd",
+      "bom-ref": "file:_internal/PIL/_avif.cp312-win_amd64.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "e931559cd5e3598bec565d6913b9f58a9b481f05cdc38f1cb642f3c32085d3fd"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/PIL/_imaging.cp312-win_amd64.pyd",
+      "bom-ref": "file:_internal/PIL/_imaging.cp312-win_amd64.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "b99a472cdec96aad3d28bfb62aa625bc18bd21dbd7ce35e7b5f352692336eccb"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/PIL/_imagingcms.cp312-win_amd64.pyd",
+      "bom-ref": "file:_internal/PIL/_imagingcms.cp312-win_amd64.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "84887800de85ca7181ce7a48563913e63e87884335a2899403732a6dbc2b1a99"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/PIL/_imagingft.cp312-win_amd64.pyd",
+      "bom-ref": "file:_internal/PIL/_imagingft.cp312-win_amd64.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "4253e7fec98e36e8996466fc19d8e9320978376dac94adc3cde18968eabe5d5a"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/PIL/_imagingtk.cp312-win_amd64.pyd",
+      "bom-ref": "file:_internal/PIL/_imagingtk.cp312-win_amd64.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "3d1ec9e687b03c4d45176c47030ad2c923f702ec0ec1944c43ecc950ce55e5e4"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/PIL/_webp.cp312-win_amd64.pyd",
+      "bom-ref": "file:_internal/PIL/_webp.cp312-win_amd64.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "c30493475c0e221f714328ce7ab1c09d1d2f0f586da2cdcb92416ecc8aebe936"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/VCRUNTIME140.dll",
+      "bom-ref": "file:_internal/VCRUNTIME140.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "d5e4d9a3e835fa679450145d6a7d94e36573a509317111904d9b3712c30d9066"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/VCRUNTIME140_1.dll",
+      "bom-ref": "file:_internal/VCRUNTIME140_1.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "1f2d41c4aa5db0bc33ebf7b66d72943a817d7ce6cbe880502a9403823633093f"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/_asyncio.pyd",
+      "bom-ref": "file:_internal/_asyncio.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "8a682ee5ae5582a23c9764c532cf0edcfc2ba7cd915f4627c16fdd609a741dc7"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/_bz2.pyd",
+      "bom-ref": "file:_internal/_bz2.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "c54228d35a291f1320e0f54972040059f13960acf8fba8b55bc8dd0c9ce0b340"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/_cffi_backend.cp312-win_amd64.pyd",
+      "bom-ref": "file:_internal/_cffi_backend.cp312-win_amd64.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "9af5e4f68a41f26b726f2e9424f9d58a4f5666189f6a48be95f406b257102aec"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/_ctypes.pyd",
+      "bom-ref": "file:_internal/_ctypes.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "4b8f850611cb4d2d9de33674b74b7f9d322d03f71aeecb9116aa7c0b8470154f"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/_decimal.pyd",
+      "bom-ref": "file:_internal/_decimal.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "479405a3da4660527a74ab0cbb4adca174740995faa19be6bd04340deb5f8bc9"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/_elementtree.pyd",
+      "bom-ref": "file:_internal/_elementtree.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "5830d03638de964c9cb41bfbea8136c967cda315d5c2862430bab27d5b10232c"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/_hashlib.pyd",
+      "bom-ref": "file:_internal/_hashlib.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "beecb32610009c64e8885d4f65cd692d7a8a3c84ac6adbe78e1436e8447f0c30"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/_lzma.pyd",
+      "bom-ref": "file:_internal/_lzma.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "e5a26272578d375d54f3e6d3a3975553c97799d63ddb2734c3f405e86560afc2"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/_multiprocessing.pyd",
+      "bom-ref": "file:_internal/_multiprocessing.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "91cbadac12bdc2c6b488e268aa7543462cf3256c2634a3a7776c4e9ee0e9b9d1"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/_overlapped.pyd",
+      "bom-ref": "file:_internal/_overlapped.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "9a5322219690e392914ce064c9ad414353041f29f77dbb2133cb24b3d8f2332f"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/_queue.pyd",
+      "bom-ref": "file:_internal/_queue.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "492d083986ff1a8c328e90891ad2a0868c04cbf445b518487f46afd5f64970e7"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/_socket.pyd",
+      "bom-ref": "file:_internal/_socket.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "e8a938a85769fcd9300eabc87a14a793c163ad26ff5cdc90e0d51a2a666647c8"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/_sqlite3.pyd",
+      "bom-ref": "file:_internal/_sqlite3.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "8f073214e38e51e10cfd2ef816bbbf05d5b0a062f9e846c4451fbc866e9f1735"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/_ssl.pyd",
+      "bom-ref": "file:_internal/_ssl.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "3f56c6cacffd775c113b109d981c8b70f875df4949efe429b182703499c00a20"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/_uuid.pyd",
+      "bom-ref": "file:_internal/_uuid.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "4495fae13aa26b209c17eb758cf7ad30d9d1b10913d723f8bd48a6573c7d0f8a"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/_wmi.pyd",
+      "bom-ref": "file:_internal/_wmi.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "c842ea80503544e8561e9deb121d2a739215345ab1b2a0c8c2bda389f96faff8"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/_zoneinfo.pyd",
+      "bom-ref": "file:_internal/_zoneinfo.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "2759a1e89840e792b1ce8ae90b251c531525b982597e3ea65dae25d98ea19a9a"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/api-ms-win-core-console-l1-1-0.dll",
+      "bom-ref": "file:_internal/api-ms-win-core-console-l1-1-0.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "015bd08815c7b934a8952c3a7578e9ce59f21136e8a880d42bbd414bec2c6058"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/api-ms-win-core-datetime-l1-1-0.dll",
+      "bom-ref": "file:_internal/api-ms-win-core-datetime-l1-1-0.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "5534812cdbdae94ba45cb216e5eb9af686b853948df54365103555abbbaf9d9a"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/api-ms-win-core-debug-l1-1-0.dll",
+      "bom-ref": "file:_internal/api-ms-win-core-debug-l1-1-0.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "837d2b1b2cd03e03fc6ccb050698b6b5763af17c201304872342a5eae9e0a2d2"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/api-ms-win-core-errorhandling-l1-1-0.dll",
+      "bom-ref": "file:_internal/api-ms-win-core-errorhandling-l1-1-0.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "de43b165f568c276c00e95acd454e3092f352a18e95874595f4f4658c06d2ec7"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/api-ms-win-core-fibers-l1-1-0.dll",
+      "bom-ref": "file:_internal/api-ms-win-core-fibers-l1-1-0.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "3cebc45bf479ad74cfabf2c6bfd4994d7ad639ed1221025981d19cedf9ce0416"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/api-ms-win-core-fibers-l1-1-1.dll",
+      "bom-ref": "file:_internal/api-ms-win-core-fibers-l1-1-1.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "5ef70308bcca628ce6b0e2856b15b1c7ae340c3f9bbbc4c1071d8c191a34a5c3"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/api-ms-win-core-file-l1-1-0.dll",
+      "bom-ref": "file:_internal/api-ms-win-core-file-l1-1-0.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "250ac829f2617bcac1c6e5b8c4f630462e20765863ba573526a3e11bbfb94a9a"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/api-ms-win-core-file-l1-2-0.dll",
+      "bom-ref": "file:_internal/api-ms-win-core-file-l1-2-0.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "ae14079a114733f60ce87b92cba42acd8083c2cd67594e53bc37dc0b97a4b465"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/api-ms-win-core-file-l2-1-0.dll",
+      "bom-ref": "file:_internal/api-ms-win-core-file-l2-1-0.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "914bf26a298713119477ea0a8e7bd43171b91344ebe24fb47ad77c49686e3d87"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/api-ms-win-core-handle-l1-1-0.dll",
+      "bom-ref": "file:_internal/api-ms-win-core-handle-l1-1-0.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "ab5489955e371b15f77906c08ec3c7affe2c7a46a08c514ca628768b4478974b"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/api-ms-win-core-heap-l1-1-0.dll",
+      "bom-ref": "file:_internal/api-ms-win-core-heap-l1-1-0.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "c70f9644d8377fa39c5b71f2e9734c1400d7598904fdeb772e8502099982dcb7"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/api-ms-win-core-interlocked-l1-1-0.dll",
+      "bom-ref": "file:_internal/api-ms-win-core-interlocked-l1-1-0.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "f8129710188e407bb0e6f46d30aeba277d67b947ece5fe09e883fde2323f3ae6"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/api-ms-win-core-kernel32-legacy-l1-1-1.dll",
+      "bom-ref": "file:_internal/api-ms-win-core-kernel32-legacy-l1-1-1.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "5200b16cb2ddc61cfc07373a9a84aa85a3ab50806ca96c879c883275832944c1"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/api-ms-win-core-libraryloader-l1-1-0.dll",
+      "bom-ref": "file:_internal/api-ms-win-core-libraryloader-l1-1-0.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "48786fb88b001dcd1f63acea903d3ca9cc0b3060d5a325e3f2f3cbc3bfd53166"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/api-ms-win-core-localization-l1-2-0.dll",
+      "bom-ref": "file:_internal/api-ms-win-core-localization-l1-2-0.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "9ec3898f7eba91faa28b51616c211a2689e3a13aeef8de6e13cb674e49d689eb"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/api-ms-win-core-memory-l1-1-0.dll",
+      "bom-ref": "file:_internal/api-ms-win-core-memory-l1-1-0.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "3a6cbc524c99e1cd80d5368f5601402a37ad602528b1ab628093573ef638eb3b"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/api-ms-win-core-namedpipe-l1-1-0.dll",
+      "bom-ref": "file:_internal/api-ms-win-core-namedpipe-l1-1-0.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "97145ef89c44949fcf0f04ac834a8bc7d687ef49ee73ae9fc32f3c11136b7201"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/api-ms-win-core-processenvironment-l1-1-0.dll",
+      "bom-ref": "file:_internal/api-ms-win-core-processenvironment-l1-1-0.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "8bc7c10b1851aea644e9c9f381cdb935e091fee6b0be3d3aedc6fffaac96adb7"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/api-ms-win-core-processthreads-l1-1-0.dll",
+      "bom-ref": "file:_internal/api-ms-win-core-processthreads-l1-1-0.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "d8030b777617c71f0f94564607699dbf7561487d779db9756aed378c5675213f"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/api-ms-win-core-processthreads-l1-1-1.dll",
+      "bom-ref": "file:_internal/api-ms-win-core-processthreads-l1-1-1.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "f5e676713340f73a03a3d41a6ec9883b431da7d16c7f07bd0a920fb80e6c0753"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/api-ms-win-core-profile-l1-1-0.dll",
+      "bom-ref": "file:_internal/api-ms-win-core-profile-l1-1-0.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "f023d47e44d3eea6b0743580f57e8c6ba81e79d5ebfa7da26250076c647b980e"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/api-ms-win-core-rtlsupport-l1-1-0.dll",
+      "bom-ref": "file:_internal/api-ms-win-core-rtlsupport-l1-1-0.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "9746d8930704153578a628c010638a5f818ffe5a927e25591b108e256dc6afca"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/api-ms-win-core-string-l1-1-0.dll",
+      "bom-ref": "file:_internal/api-ms-win-core-string-l1-1-0.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "7c53ae24c982d16ffd1bf7f918d115b11b7f30e57bc7feaa18cb9781e4abb926"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/api-ms-win-core-synch-l1-1-0.dll",
+      "bom-ref": "file:_internal/api-ms-win-core-synch-l1-1-0.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "56d9d62ca5dba79a6581b8d574a7d8b2a64a5ecb71e47dcf06ed0285708b1859"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/api-ms-win-core-synch-l1-2-0.dll",
+      "bom-ref": "file:_internal/api-ms-win-core-synch-l1-2-0.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "f6482bbec5612c39ecb4822787a333f2b7570f7a5f922a4059be41ba957bb372"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/api-ms-win-core-sysinfo-l1-1-0.dll",
+      "bom-ref": "file:_internal/api-ms-win-core-sysinfo-l1-1-0.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "272d02765fdd3582618236c2d309abba069642f9bc1062ede069d0c144e17007"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/api-ms-win-core-sysinfo-l1-2-0.dll",
+      "bom-ref": "file:_internal/api-ms-win-core-sysinfo-l1-2-0.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "8a0900788859d0eb51c2f48f50cc6ed376a120b518100fa20e11d7702ccde260"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/api-ms-win-core-timezone-l1-1-0.dll",
+      "bom-ref": "file:_internal/api-ms-win-core-timezone-l1-1-0.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "ff35de6c03812b332e140f17dade25c5dd4775156da9eeb1eaae3fddd27236ec"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/api-ms-win-core-util-l1-1-0.dll",
+      "bom-ref": "file:_internal/api-ms-win-core-util-l1-1-0.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "191ef3e98641a57296f19d572d8eb62489470ff1ef6030d136af170c2f835173"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/api-ms-win-crt-conio-l1-1-0.dll",
+      "bom-ref": "file:_internal/api-ms-win-crt-conio-l1-1-0.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "54ee5ec719a051496ff60aa00dbeaa94b9a7d2cdac27fe9b7317f1a666b6a2aa"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/api-ms-win-crt-convert-l1-1-0.dll",
+      "bom-ref": "file:_internal/api-ms-win-crt-convert-l1-1-0.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "8b94662429171019fcd63c70bbf2095a075170599704a5e7dcdbe3da13f3a429"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/api-ms-win-crt-environment-l1-1-0.dll",
+      "bom-ref": "file:_internal/api-ms-win-crt-environment-l1-1-0.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "39e5929593709e8af3bc9e0a75ec1155778d6f4a247f4cdfc58928ad6db88434"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/api-ms-win-crt-filesystem-l1-1-0.dll",
+      "bom-ref": "file:_internal/api-ms-win-crt-filesystem-l1-1-0.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "5a8ecebac32edf4e1f3c5c6c1c8ea1a1add6cda4f9c9cb26f752fb295bea6865"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/api-ms-win-crt-heap-l1-1-0.dll",
+      "bom-ref": "file:_internal/api-ms-win-crt-heap-l1-1-0.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "c71080cbcb43bf1f8f3e391deb12a582eb0abefc80946f340675a2c616e4feb4"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/api-ms-win-crt-locale-l1-1-0.dll",
+      "bom-ref": "file:_internal/api-ms-win-crt-locale-l1-1-0.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "6c68648e524187e03c4ad9aaa4a99113c6ee9f29fb39cc0ed93f951975138e63"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/api-ms-win-crt-math-l1-1-0.dll",
+      "bom-ref": "file:_internal/api-ms-win-crt-math-l1-1-0.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "d4fbcccbe29371cbce431e43b2eb4f7ba9a6f04a3d740a071f02457a505e9dc8"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/api-ms-win-crt-private-l1-1-0.dll",
+      "bom-ref": "file:_internal/api-ms-win-crt-private-l1-1-0.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "29bf3d90617d3781d19b332d6ceb9f20ba5ce082ec74bf6c34d5d4aee56e48a1"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/api-ms-win-crt-process-l1-1-0.dll",
+      "bom-ref": "file:_internal/api-ms-win-crt-process-l1-1-0.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "47c1935942e3ac0812e4dcf18c0e265e565f0194a3349111c299712f5565f7ac"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/api-ms-win-crt-runtime-l1-1-0.dll",
+      "bom-ref": "file:_internal/api-ms-win-crt-runtime-l1-1-0.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "72adc1b3677e0814d9c4ebf0964000e84bb2acf67336c8963061665e44f78029"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/api-ms-win-crt-stdio-l1-1-0.dll",
+      "bom-ref": "file:_internal/api-ms-win-crt-stdio-l1-1-0.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "900afc3989673c9bb1a687ed38c192f46db9e6ba6d11a668898a539e7fc23798"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/api-ms-win-crt-string-l1-1-0.dll",
+      "bom-ref": "file:_internal/api-ms-win-crt-string-l1-1-0.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "fcf12466cc12fd3b73611fc0763a5a1f9d44e90349513c34a0c83b0f36421793"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/api-ms-win-crt-time-l1-1-0.dll",
+      "bom-ref": "file:_internal/api-ms-win-crt-time-l1-1-0.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "886e57c4a6adb299b38f02945369f590a67da4e79a798359fc60aaa067212d7c"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/api-ms-win-crt-utility-l1-1-0.dll",
+      "bom-ref": "file:_internal/api-ms-win-crt-utility-l1-1-0.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "5f8f26b216ade615b67a41f6fbbb910972fc6153315a65bb8f09912be50215b1"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/charset_normalizer/cd.cp312-win_amd64.pyd",
+      "bom-ref": "file:_internal/charset_normalizer/cd.cp312-win_amd64.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "1a0c674a6bb0886842c99085d89a0f687e0400b11d13ccab6d7428f212abe66b"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/charset_normalizer/md.cp312-win_amd64.pyd",
+      "bom-ref": "file:_internal/charset_normalizer/md.cp312-win_amd64.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "1e89785e54b76371e9d4e7149724f4318f06c35c38efbe160cf0221935451698"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/clr_loader/ffi/dlls/amd64/ClrLoader.dll",
+      "bom-ref": "file:_internal/clr_loader/ffi/dlls/amd64/ClrLoader.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "07f62bcb1b70320f221ffb2cfc5ce6133815195f3e7cdb8d833222506188c2ac"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/clr_loader/ffi/dlls/x86/ClrLoader.dll",
+      "bom-ref": "file:_internal/clr_loader/ffi/dlls/x86/ClrLoader.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "3128381d133f4ff746add70100cfef713ce2d78f2b12c02ec24ec453c5dfab0d"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/cryptography/hazmat/bindings/_rust.pyd",
+      "bom-ref": "file:_internal/cryptography/hazmat/bindings/_rust.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "97cf66f27516f468993a247015ab16d54e4e60f35dca382f8106b0b5313f81ff"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/dist/assets/grid-D6uDUhLJ.js",
+      "bom-ref": "file:_internal/dist/assets/grid-D6uDUhLJ.js",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "46c0b4a2a7166fee4e526e7125913c1e4bdb579db343b5192d2796c411201ad0"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/dist/assets/index-DYWvNvmv.js",
+      "bom-ref": "file:_internal/dist/assets/index-DYWvNvmv.js",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "068b2c8269d077c3e99eed68880f32f304539b99ebd07a97b705e7be4bc69b75"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/libcrypto-3-x64.dll",
+      "bom-ref": "file:_internal/libcrypto-3-x64.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "cf281b9b8cb4ca68c09cb7e9ffea189e482678d0c7a8255c4f80b1ac3bb26098"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/libffi-8.dll",
+      "bom-ref": "file:_internal/libffi-8.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "7d76d373d67e81331c23db36910f27d52f24465081a5b6809dbb57b7658210a0"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/libssl-3-x64.dll",
+      "bom-ref": "file:_internal/libssl-3-x64.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "cd9690f8df1116088891a8467366cb20a2c6a06f3cbdba728443bd60d8a50ccd"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/lxml/_elementpath.cp312-win_amd64.pyd",
+      "bom-ref": "file:_internal/lxml/_elementpath.cp312-win_amd64.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "0d93647fd6e37b582c398e17e37fdce5a399c5dc210617c1ca062c954de2e95d"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/lxml/builder.cp312-win_amd64.pyd",
+      "bom-ref": "file:_internal/lxml/builder.cp312-win_amd64.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "e9fe28e1a7ca3f4d616ebc1760b3cc9977aedf49c562325b78b669eb6f9df73c"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/lxml/etree.cp312-win_amd64.pyd",
+      "bom-ref": "file:_internal/lxml/etree.cp312-win_amd64.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "53f6cffedfc486a5a0e0234a9444cf62ea931b2c64234dc2e9752218bc2e6fdb"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/lxml/html/_difflib.cp312-win_amd64.pyd",
+      "bom-ref": "file:_internal/lxml/html/_difflib.cp312-win_amd64.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "ee80169606ae85c9c5de7bcaffe97c80794eba9876031c07f81c888fe7274e0e"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/lxml/html/diff.cp312-win_amd64.pyd",
+      "bom-ref": "file:_internal/lxml/html/diff.cp312-win_amd64.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "01b36bd4916f90174c91ac9c3f8759fce9c454558176a485526a2179b110e434"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/lxml/objectify.cp312-win_amd64.pyd",
+      "bom-ref": "file:_internal/lxml/objectify.cp312-win_amd64.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "a00f246c3ebdbbe90cb8c869342fd54aad4af0dc17e013c0d44fc214f8640949"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/lxml/sax.cp312-win_amd64.pyd",
+      "bom-ref": "file:_internal/lxml/sax.cp312-win_amd64.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "a9793f43bdac75d4a7321b7cb367ce3523b70090cbc2ee4bfdc33c94b89b8394"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/markupsafe/_speedups.cp312-win_amd64.pyd",
+      "bom-ref": "file:_internal/markupsafe/_speedups.cp312-win_amd64.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "a1bf1fb566f920b5670dca3b31acb0148636cfff8aa8108d938f91550358b231"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/numpy.libs/libscipy_openblas64_-9e3e5a4229c1ca39f10dc82bba9e2b2b.dll",
+      "bom-ref": "file:_internal/numpy.libs/libscipy_openblas64_-9e3e5a4229c1ca39f10dc82bba9e2b2b.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "8dc5576b6590103347a81c6704150602247e0a440878ff1158936fc9b010c5b1"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/numpy.libs/msvcp140-a4c2229bdc2a2a630acdc095b4d86008.dll",
+      "bom-ref": "file:_internal/numpy.libs/msvcp140-a4c2229bdc2a2a630acdc095b4d86008.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "a4c2229bdc2a2a630acdc095b4d86008e5c3e3bc7773174354f3da4f5beb9cde"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/numpy/_core/_multiarray_tests.cp312-win_amd64.pyd",
+      "bom-ref": "file:_internal/numpy/_core/_multiarray_tests.cp312-win_amd64.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "214a427356693292f154174d05bc14a616040754770c4ec2d8e48797bce0b550"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/numpy/_core/_multiarray_umath.cp312-win_amd64.pyd",
+      "bom-ref": "file:_internal/numpy/_core/_multiarray_umath.cp312-win_amd64.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "789c4cc80d17ab3dc5ede9ecf4efed219ceca2b39e325f847b6422376ced6a66"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/numpy/fft/_pocketfft_umath.cp312-win_amd64.pyd",
+      "bom-ref": "file:_internal/numpy/fft/_pocketfft_umath.cp312-win_amd64.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "843f02065faba89d9dd0f4f46d7cd4fed73c2b752edf554c8691148d8aca92e1"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/numpy/linalg/_umath_linalg.cp312-win_amd64.pyd",
+      "bom-ref": "file:_internal/numpy/linalg/_umath_linalg.cp312-win_amd64.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "8abdfb5ce4709e26c94b9bc1581562bbcfaaa78c4aa733cb22c4c7afc6fc6674"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/numpy/random/_bounded_integers.cp312-win_amd64.pyd",
+      "bom-ref": "file:_internal/numpy/random/_bounded_integers.cp312-win_amd64.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "6e844b24e8962c6a2f8099004b455feaa8a79cda8d07f9df9043f98defa82a7a"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/numpy/random/_common.cp312-win_amd64.pyd",
+      "bom-ref": "file:_internal/numpy/random/_common.cp312-win_amd64.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "2d0765c0e6ece27cbea6123897a3ed762e0f7ad734e06db992be7294e4227bdc"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/numpy/random/_generator.cp312-win_amd64.pyd",
+      "bom-ref": "file:_internal/numpy/random/_generator.cp312-win_amd64.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "a92d5dd92230d775cdcc5db50405bb98e042045c76d90c37725c4cef20a5952b"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/numpy/random/_mt19937.cp312-win_amd64.pyd",
+      "bom-ref": "file:_internal/numpy/random/_mt19937.cp312-win_amd64.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "20a048379b0dc5c51801dd70e60a54f1adbbc4af5247be08918692cc09e8db67"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/numpy/random/_pcg64.cp312-win_amd64.pyd",
+      "bom-ref": "file:_internal/numpy/random/_pcg64.cp312-win_amd64.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "d93d235f3240093b623c9779e448a0467a9de12e5182125e074915d7495993e6"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/numpy/random/_philox.cp312-win_amd64.pyd",
+      "bom-ref": "file:_internal/numpy/random/_philox.cp312-win_amd64.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "fe40a0ff146d106cb89bad12f54b666409a0b98a25074f329716c4f3847b4bc4"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/numpy/random/_sfc64.cp312-win_amd64.pyd",
+      "bom-ref": "file:_internal/numpy/random/_sfc64.cp312-win_amd64.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "5dc75ac9989bde6b9904c315f866d341e97d6507f14a5ec3b91ea62b76c381d8"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/numpy/random/bit_generator.cp312-win_amd64.pyd",
+      "bom-ref": "file:_internal/numpy/random/bit_generator.cp312-win_amd64.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "08f1049451a43ba3d47b17c8766b6d83e9e15d56a8df0339c6241b65f6e42002"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/numpy/random/mtrand.cp312-win_amd64.pyd",
+      "bom-ref": "file:_internal/numpy/random/mtrand.cp312-win_amd64.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "a1f872c018571ca645ca6d443d4d9060c92a5b4d1fed9a3d29b3fc3b558ee03c"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/pydantic_core/_pydantic_core.cp312-win_amd64.pyd",
+      "bom-ref": "file:_internal/pydantic_core/_pydantic_core.cp312-win_amd64.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "c7f18997006f997fd0126367a42668f497c054fc3749e61eb3eccee3807b5028"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/pyexpat.pyd",
+      "bom-ref": "file:_internal/pyexpat.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "c198c49b52e661e46f53ef7e00cf50ab5d67e0d0cab3e08a27f61c0e27fffdfb"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/pypdfium2_raw/pdfium.dll",
+      "bom-ref": "file:_internal/pypdfium2_raw/pdfium.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "036cbcb5466bda6cfdcb9b188de1129f6ae2f63428e53d457bedaa8782160826"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/python3.dll",
+      "bom-ref": "file:_internal/python3.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "163c10a5908fc13e5030725cf7aa4482f393678b789fd4ab3aff4e5b55bdcd61"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/python312.dll",
+      "bom-ref": "file:_internal/python312.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "c86b9d1407e9c82161a203d663888d7b808f19be9ea874496bae2c2a6ca6cf94"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/pythonnet/runtime/Python.Runtime.dll",
+      "bom-ref": "file:_internal/pythonnet/runtime/Python.Runtime.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "2ebd4492e28442ef1f1af587afe5b3a090c2ebfa220758ded4f1450f2a27f13a"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/select.pyd",
+      "bom-ref": "file:_internal/select.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "19e3811839a8de7f7a4dd6c9802feee33379b51b4a07cc4f0e1b269363d495b1"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/sqlalchemy/engine/_processors_cy.cp312-win_amd64.pyd",
+      "bom-ref": "file:_internal/sqlalchemy/engine/_processors_cy.cp312-win_amd64.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "d184fbd49e00d14730461b422491da978a5702cf125208e097112707e2cd7c35"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/sqlalchemy/engine/_result_cy.cp312-win_amd64.pyd",
+      "bom-ref": "file:_internal/sqlalchemy/engine/_result_cy.cp312-win_amd64.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "08c2b88b4f5a537d46a2979ad5ee606877edfb2c8f8b6264165bde6d6f8e4299"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/sqlalchemy/engine/_row_cy.cp312-win_amd64.pyd",
+      "bom-ref": "file:_internal/sqlalchemy/engine/_row_cy.cp312-win_amd64.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "5b9ed462e944746284e5fd892c02e640be31902f6c3e7cfe3ef49b231db24690"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/sqlalchemy/engine/_util_cy.cp312-win_amd64.pyd",
+      "bom-ref": "file:_internal/sqlalchemy/engine/_util_cy.cp312-win_amd64.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "c6b7ac1557789ea1745730a5a4e3a0da475539ed9d34a427afaad35e1719a462"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/sqlalchemy/sql/_cache_key_cy.cp312-win_amd64.pyd",
+      "bom-ref": "file:_internal/sqlalchemy/sql/_cache_key_cy.cp312-win_amd64.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "e91b36c6dfa8135c20059c8af58e55ae2e37636043abcd34ba9557208d1fe2f3"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/sqlalchemy/sql/_util_cy.cp312-win_amd64.pyd",
+      "bom-ref": "file:_internal/sqlalchemy/sql/_util_cy.cp312-win_amd64.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "c25f7b05f39bd68c56cbc3ffa4a763d59cae25c10bda3afb1831e03b52372c73"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/sqlalchemy/util/_collections_cy.cp312-win_amd64.pyd",
+      "bom-ref": "file:_internal/sqlalchemy/util/_collections_cy.cp312-win_amd64.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "ef31a77c0bfff812ff2fa1b98508d73dc5f9711c6dfa47e35f2b54c2fb0a38dd"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/sqlalchemy/util/_immutabledict_cy.cp312-win_amd64.pyd",
+      "bom-ref": "file:_internal/sqlalchemy/util/_immutabledict_cy.cp312-win_amd64.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "a2c6d0561e7259971b3944c34c81627ee0826e2a5f8261cd13c717a05bd85ebb"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/sqlite3.dll",
+      "bom-ref": "file:_internal/sqlite3.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "4e871b6eba6b0cca769b6626621874e0cf5cac5ed84a3ba6a2223b8f01bbe35e"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/ucrtbase.dll",
+      "bom-ref": "file:_internal/ucrtbase.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "3239227d27667ba20d10a880751924e5719de0078f9fce232d149d383f7681f6"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/unicodedata.pyd",
+      "bom-ref": "file:_internal/unicodedata.pyd",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "cf2572f55d0c9c02c61a0fc92825f755ee8709f48270ca2bc46fa5f862ba4115"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/webview/js/api.js",
+      "bom-ref": "file:_internal/webview/js/api.js",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "cb68b8bed427fa356aea26376e497552f55d91329c093c026a65230d074e2b27"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/webview/js/customize.js",
+      "bom-ref": "file:_internal/webview/js/customize.js",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "ed14d0b594266dfe3834cc8565b44a8157420432aeef4f733ab505bd6ed89b8a"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/webview/js/finish.js",
+      "bom-ref": "file:_internal/webview/js/finish.js",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "751443083dd1d2b2ef4142692f25bc4f6e04f8de4d82c455c73473700f00c8cb"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/webview/js/lib/dom_json.js",
+      "bom-ref": "file:_internal/webview/js/lib/dom_json.js",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "70fae2a8a8ebc790dc616aa7976074cedd802275c173c90ad4bf3bd14163f9c4"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/webview/js/lib/polyfill.js",
+      "bom-ref": "file:_internal/webview/js/lib/polyfill.js",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "481a08f5337a770acf49b38c2f58dd0c95f92bf9dbd92bf82b596836ea343ab5"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/webview/js/state.js",
+      "bom-ref": "file:_internal/webview/js/state.js",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "68ee87ec01563cbcab77a57704a32f19b47436c9d5e254bfba9675a51c132075"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/webview/lib/Microsoft.Web.WebView2.Core.dll",
+      "bom-ref": "file:_internal/webview/lib/Microsoft.Web.WebView2.Core.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "8219a3135436c147f8eb02fb831e99596103eebc18b6d7b794ca93f4c67018a2"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/webview/lib/Microsoft.Web.WebView2.WinForms.dll",
+      "bom-ref": "file:_internal/webview/lib/Microsoft.Web.WebView2.WinForms.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "c48f8d729dc531288d2c53a6241effe7922ed1b947850b2442008a945c098c48"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/webview/lib/WebBrowserInterop.x64.dll",
+      "bom-ref": "file:_internal/webview/lib/WebBrowserInterop.x64.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "f6a646470f0e1058224a52e8e2e217501dca46939b30bfc9a5dd4dcdd43f088d"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/webview/lib/WebBrowserInterop.x86.dll",
+      "bom-ref": "file:_internal/webview/lib/WebBrowserInterop.x86.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "4e527297fbea7c5a0419f3a6af307c2681787beb0bf0ef3fea849a7fd85a08dc"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/webview/lib/runtimes/win-arm64/native/WebView2Loader.dll",
+      "bom-ref": "file:_internal/webview/lib/runtimes/win-arm64/native/WebView2Loader.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "0937030efc718f3da77c5e0978fb5046e381d0bb7b01acaad31a535a1b588a33"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/webview/lib/runtimes/win-x64/native/WebView2Loader.dll",
+      "bom-ref": "file:_internal/webview/lib/runtimes/win-x64/native/WebView2Loader.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "eb5335edeaa6f2122c044e82aab2351dc8c9b4e0fe5e578c71922fb61be285e7"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "_internal/webview/lib/runtimes/win-x86/native/WebView2Loader.dll",
+      "bom-ref": "file:_internal/webview/lib/runtimes/win-x86/native/WebView2Loader.dll",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "04814b2c59314c6452d61b821a4a3a5c5f8e8577b55b985f6a7a4b59f8907ec5"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "공동정산 수출실적 관리.exe",
+      "bom-ref": "file:공동정산 수출실적 관리.exe",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "384dda7a93217ed791f84d246adffb48967b116bdd261c3ba5e125eeee63257e"
+        }
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "ref": "epms",
+      "dependsOn": [
+        "npm:node_modules/@tanstack/react-query",
+        "npm:node_modules/ag-grid-community",
+        "npm:node_modules/ag-grid-react",
+        "npm:node_modules/react",
+        "npm:node_modules/react-dom",
+        "npm:node_modules/react-router-dom",
+        "pypi:alembic",
+        "pypi:fastapi",
+        "pypi:openpyxl",
+        "pypi:pillow",
+        "pypi:pypdfium2",
+        "pypi:pywebview",
+        "pypi:sqlalchemy",
+        "pypi:tzdata",
+        "pypi:uvicorn",
+        "runtime:cpython"
+      ]
+    },
+    {
+      "ref": "npm:node_modules/@tanstack/query-core",
+      "dependsOn": []
+    },
+    {
+      "ref": "npm:node_modules/@tanstack/react-query",
+      "dependsOn": [
+        "npm:node_modules/@tanstack/query-core",
+        "npm:node_modules/@types/react",
+        "npm:node_modules/react"
+      ]
+    },
+    {
+      "ref": "npm:node_modules/@types/react",
+      "dependsOn": [
+        "npm:node_modules/csstype"
+      ]
+    },
+    {
+      "ref": "runtime:cpython",
+      "dependsOn": []
+    },
+    {
+      "ref": "pypi:mako",
+      "dependsOn": [
+        "pypi:markupsafe"
+      ]
+    },
+    {
+      "ref": "pypi:markupsafe",
+      "dependsOn": []
+    },
+    {
+      "ref": "pypi:pygments",
+      "dependsOn": []
+    },
+    {
+      "ref": "pypi:sqlalchemy",
+      "dependsOn": [
+        "pypi:typing-extensions"
+      ]
+    },
+    {
+      "ref": "npm:node_modules/ag-charts-types",
+      "dependsOn": []
+    },
+    {
+      "ref": "npm:node_modules/ag-grid-community",
+      "dependsOn": [
+        "npm:node_modules/ag-charts-types",
+        "npm:node_modules/ag-stack"
+      ]
+    },
+    {
+      "ref": "npm:node_modules/ag-grid-react",
+      "dependsOn": [
+        "npm:node_modules/ag-grid-community",
+        "npm:node_modules/prop-types",
+        "npm:node_modules/react",
+        "npm:node_modules/react-dom"
+      ]
+    },
+    {
+      "ref": "npm:node_modules/ag-stack",
+      "dependsOn": []
+    },
+    {
+      "ref": "pypi:alembic",
+      "dependsOn": [
+        "pypi:mako",
+        "pypi:sqlalchemy",
+        "pypi:typing-extensions"
+      ]
+    },
+    {
+      "ref": "pypi:altgraph",
+      "dependsOn": []
+    },
+    {
+      "ref": "pypi:annotated-doc",
+      "dependsOn": []
+    },
+    {
+      "ref": "pypi:annotated-types",
+      "dependsOn": []
+    },
+    {
+      "ref": "pypi:anyio",
+      "dependsOn": [
+        "pypi:idna",
+        "pypi:typing-extensions"
+      ]
+    },
+    {
+      "ref": "pypi:bottle",
+      "dependsOn": []
+    },
+    {
+      "ref": "pypi:cffi",
+      "dependsOn": [
+        "pypi:pycparser"
+      ]
+    },
+    {
+      "ref": "pypi:charset-normalizer",
+      "dependsOn": []
+    },
+    {
+      "ref": "pypi:click",
+      "dependsOn": []
+    },
+    {
+      "ref": "pypi:clr-loader",
+      "dependsOn": [
+        "pypi:cffi"
+      ]
+    },
+    {
+      "ref": "pypi:colorama",
+      "dependsOn": []
+    },
+    {
+      "ref": "npm:node_modules/cookie",
+      "dependsOn": []
+    },
+    {
+      "ref": "pypi:cryptography",
+      "dependsOn": [
+        "pypi:cffi"
+      ]
+    },
+    {
+      "ref": "npm:node_modules/csstype",
+      "dependsOn": []
+    },
+    {
+      "ref": "pypi:et-xmlfile",
+      "dependsOn": []
+    },
+    {
+      "ref": "pypi:fastapi",
+      "dependsOn": [
+        "pypi:annotated-doc",
+        "pypi:anyio",
+        "pypi:opentelemetry-api",
+        "pypi:pydantic",
+        "pypi:starlette",
+        "pypi:typing-extensions",
+        "pypi:typing-inspection"
+      ]
+    },
+    {
+      "ref": "pypi:h11",
+      "dependsOn": []
+    },
+    {
+      "ref": "pypi:idna",
+      "dependsOn": []
+    },
+    {
+      "ref": "pypi:iniconfig",
+      "dependsOn": []
+    },
+    {
+      "ref": "npm:node_modules/js-tokens",
+      "dependsOn": []
+    },
+    {
+      "ref": "npm:node_modules/loose-envify",
+      "dependsOn": [
+        "npm:node_modules/js-tokens"
+      ]
+    },
+    {
+      "ref": "pypi:lxml",
+      "dependsOn": []
+    },
+    {
+      "ref": "pypi:numpy",
+      "dependsOn": []
+    },
+    {
+      "ref": "npm:node_modules/object-assign",
+      "dependsOn": []
+    },
+    {
+      "ref": "pypi:openpyxl",
+      "dependsOn": [
+        "pypi:et-xmlfile"
+      ]
+    },
+    {
+      "ref": "pypi:opentelemetry-api",
+      "dependsOn": [
+        "pypi:typing-extensions"
+      ]
+    },
+    {
+      "ref": "pypi:packaging",
+      "dependsOn": []
+    },
+    {
+      "ref": "pypi:pefile",
+      "dependsOn": []
+    },
+    {
+      "ref": "pypi:pillow",
+      "dependsOn": []
+    },
+    {
+      "ref": "pypi:pluggy",
+      "dependsOn": []
+    },
+    {
+      "ref": "npm:node_modules/prop-types",
+      "dependsOn": [
+        "npm:node_modules/loose-envify",
+        "npm:node_modules/object-assign",
+        "npm:node_modules/react-is"
+      ]
+    },
+    {
+      "ref": "pypi:proxy-tools",
+      "dependsOn": []
+    },
+    {
+      "ref": "pypi:pycparser",
+      "dependsOn": []
+    },
+    {
+      "ref": "pypi:pydantic",
+      "dependsOn": [
+        "pypi:annotated-types",
+        "pypi:pydantic-core",
+        "pypi:typing-extensions",
+        "pypi:typing-inspection"
+      ]
+    },
+    {
+      "ref": "pypi:pydantic-core",
+      "dependsOn": [
+        "pypi:typing-extensions"
+      ]
+    },
+    {
+      "ref": "pypi:pyinstaller",
+      "dependsOn": [
+        "pypi:altgraph",
+        "pypi:packaging",
+        "pypi:pefile",
+        "pypi:pyinstaller-hooks-contrib",
+        "pypi:pywin32-ctypes",
+        "pypi:setuptools"
+      ]
+    },
+    {
+      "ref": "pypi:pyinstaller-hooks-contrib",
+      "dependsOn": [
+        "pypi:packaging"
+      ]
+    },
+    {
+      "ref": "pypi:pypdfium2",
+      "dependsOn": [
+        "runtime:pdfium"
+      ]
+    },
+    {
+      "ref": "pypi:pytest",
+      "dependsOn": [
+        "pypi:colorama",
+        "pypi:iniconfig",
+        "pypi:packaging",
+        "pypi:pluggy",
+        "pypi:pygments"
+      ]
+    },
+    {
+      "ref": "pypi:pythonnet",
+      "dependsOn": [
+        "pypi:clr-loader"
+      ]
+    },
+    {
+      "ref": "pypi:pywebview",
+      "dependsOn": [
+        "pypi:bottle",
+        "pypi:proxy-tools",
+        "pypi:pythonnet",
+        "pypi:typing-extensions"
+      ]
+    },
+    {
+      "ref": "pypi:pywin32-ctypes",
+      "dependsOn": []
+    },
+    {
+      "ref": "npm:node_modules/react",
+      "dependsOn": []
+    },
+    {
+      "ref": "npm:node_modules/react-dom",
+      "dependsOn": [
+        "npm:node_modules/react",
+        "npm:node_modules/scheduler"
+      ]
+    },
+    {
+      "ref": "npm:node_modules/react-is",
+      "dependsOn": []
+    },
+    {
+      "ref": "npm:node_modules/react-router",
+      "dependsOn": [
+        "npm:node_modules/cookie",
+        "npm:node_modules/react",
+        "npm:node_modules/react-dom",
+        "npm:node_modules/set-cookie-parser"
+      ]
+    },
+    {
+      "ref": "npm:node_modules/react-router-dom",
+      "dependsOn": [
+        "npm:node_modules/react",
+        "npm:node_modules/react-dom",
+        "npm:node_modules/react-router"
+      ]
+    },
+    {
+      "ref": "npm:node_modules/scheduler",
+      "dependsOn": []
+    },
+    {
+      "ref": "npm:node_modules/set-cookie-parser",
+      "dependsOn": []
+    },
+    {
+      "ref": "pypi:setuptools",
+      "dependsOn": []
+    },
+    {
+      "ref": "pypi:starlette",
+      "dependsOn": [
+        "pypi:anyio",
+        "pypi:typing-extensions"
+      ]
+    },
+    {
+      "ref": "pypi:typing-inspection",
+      "dependsOn": [
+        "pypi:typing-extensions"
+      ]
+    },
+    {
+      "ref": "pypi:typing-extensions",
+      "dependsOn": []
+    },
+    {
+      "ref": "pypi:tzdata",
+      "dependsOn": []
+    },
+    {
+      "ref": "pypi:uvicorn",
+      "dependsOn": [
+        "pypi:click",
+        "pypi:h11"
+      ]
+    },
+    {
+      "ref": "pypi:wheel",
+      "dependsOn": [
+        "pypi:packaging"
+      ]
+    },
+    {
+      "ref": "runtime:pdfium",
+      "dependsOn": []
+    }
+  ]
+}

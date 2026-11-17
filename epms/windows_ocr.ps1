@@ -26,6 +26,28 @@ try {
     $bitmap = Await ($decoder.GetSoftwareBitmapAsync()) ([Windows.Graphics.Imaging.SoftwareBitmap])
     try {
         $result = Await ($engine.RecognizeAsync($bitmap)) ([Windows.Media.Ocr.OcrResult])
-        $result.Lines | ForEach-Object { [Console]::WriteLine($_.Text) }
+        $lineIndex = 0
+        $lines = @(foreach ($line in $result.Lines) {
+            $wordIndex = 0
+            $words = @(foreach ($word in $line.Words) {
+                $rect = $word.BoundingRect
+                @{ text = $word.Text; index = $wordIndex; rect = @($rect.X, $rect.Y, $rect.Width, $rect.Height) }
+                $wordIndex += 1
+            })
+            @{
+                text = $line.Text
+                index = $lineIndex
+                words = $words
+            }
+            $lineIndex += 1
+        })
+        $payload = @{
+            width = $bitmap.PixelWidth
+            height = $bitmap.PixelHeight
+            angle = $result.TextAngle
+            text = $result.Text
+            lines = $lines
+        }
+        [Console]::WriteLine((ConvertTo-Json -InputObject $payload -Depth 6 -Compress))
     } finally { $bitmap.Dispose() }
 } finally { $stream.Dispose() }

@@ -1,0 +1,19 @@
+{
+  "id": "unipass-export-certificate",
+  "name": "UNI-PASS 수출신고필증",
+  "version": 2,
+  "documentType": "export-certificate",
+  "sourceForm": "https://www.law.go.kr/LSW/flDownload.do?bylClsCd=200203&flSeq=159840053",
+  "sourceFormRevision": null,
+  "titles": ["수출신고필증", "수출이행신고필증"],
+  "variants": [
+    {"id": "preloading-cover", "qualifier": "적재전,갑지"},
+    {"id": "preloading-continuation", "qualifier": "적재전,을지"},
+    {"id": "completed-cover", "qualifier": "수출이행,갑지"},
+    {"id": "completed-continuation", "qualifier": "수출이행,을지"}
+  ],
+  "lineMarkers": ["란번호/총란수", "란번호/총란번호"],
+  "summaryMarkers": ["총신고가격", "총중량", "총포장갯수", "총포장개수"],
+  "headerAnchors": {"number": "신고번호", "declared": "신고일자"},
+  "coordinateSystem": "normalized-top-left"
+}

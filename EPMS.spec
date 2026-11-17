@@ -2,12 +2,16 @@
 from PyInstaller.utils.hooks import collect_data_files
 from PyInstaller.utils.hooks import collect_all
 from PyInstaller.utils.hooks import collect_submodules, get_module_file_attribute
+from pathlib import Path
 
-datas = [('dist', 'dist'), ('epms/submission_2027.json', 'epms'), ('epms/migrations', 'epms/migrations'), ('build/template/2027-공식양식.xlsx', 'samples')]
+datas = [('dist', 'dist'), ('epms/submission_2027.json', 'epms'),
+         ('epms/migrations/env.py', 'epms/migrations'),
+         ('build/template/2027-공식양식.xlsx', 'samples')]
+datas += [(str(file), 'epms/migrations/versions') for file in sorted(Path('epms/migrations/versions').glob('*.py'))]
 binaries = []
 hiddenimports = []
 datas += collect_data_files('tzdata')
-datas += [('epms/windows_ocr.ps1', 'epms')]
+datas += [('epms/windows_ocr.ps1', 'epms'), ('epms/ocr_unipass.json', 'epms')]
 tmp_ret = collect_all('pypdfium2_raw')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 hiddenimports += collect_submodules('uvicorn')

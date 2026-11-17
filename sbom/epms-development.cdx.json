@@ -1,0 +1,1470 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "version": 1,
+  "metadata": {
+    "component": {
+      "type": "application",
+      "name": "EPMS development",
+      "bom-ref": "epms"
+    },
+    "properties": [
+      {
+        "name": "epms:inventory-scope",
+        "value": "build inputs and packaged file hashes"
+      },
+      {
+        "name": "epms:sha256:requirements.txt",
+        "value": "3acbbe15fd073521f5554ac8e54122dbf061a0fa91e36007f479263dbd357ea3"
+      },
+      {
+        "name": "epms:sha256:requirements-dev.txt",
+        "value": "ab61b0ea64dd9574f20097c25ef9e8a924cd20eff4543dbae53b86f16c262588"
+      },
+      {
+        "name": "epms:sha256:package-lock.json",
+        "value": "087fa00426ed3e88106a4272d646eb972af2c9b00effad64a42aec0b6497adae"
+      },
+      {
+        "name": "epms:sha256:ocr_unipass.json",
+        "value": "fa272beb28f4fda4d517e649250f0ea6c5d7fc2287ef66ec266a9535d8ca71af"
+      }
+    ]
+  },
+  "components": [
+    {
+      "type": "library",
+      "name": "@tanstack/query-core",
+      "version": "5.107.1",
+      "bom-ref": "npm:node_modules/@tanstack/query-core",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:npm/%40tanstack/query-core@5.107.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "@tanstack/react-query",
+      "version": "5.107.1",
+      "bom-ref": "npm:node_modules/@tanstack/react-query",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:npm/%40tanstack/react-query@5.107.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "@types/react",
+      "version": "19.3.0",
+      "bom-ref": "npm:node_modules/@types/react",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:npm/%40types/react@19.3.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "CPython",
+      "version": "3.12.14",
+      "bom-ref": "runtime:cpython",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "supplier": {
+        "name": "Python Software Foundation"
+      },
+      "licenses": [
+        {
+          "license": {
+            "name": "PSF-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "Mako",
+      "version": "1.4.3",
+      "bom-ref": "pypi:mako",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:pypi/mako@1.4.3",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "MarkupSafe",
+      "version": "3.0.4",
+      "bom-ref": "pypi:markupsafe",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:pypi/markupsafe@3.0.4",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD-3-Clause"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "SQLAlchemy",
+      "version": "2.1.8",
+      "bom-ref": "pypi:sqlalchemy",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:pypi/sqlalchemy@2.1.8",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "ag-charts-types",
+      "version": "14.3.0",
+      "bom-ref": "npm:node_modules/ag-charts-types",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:npm/ag-charts-types@14.3.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "ag-grid-community",
+      "version": "36.3.0",
+      "bom-ref": "npm:node_modules/ag-grid-community",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:npm/ag-grid-community@36.3.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "ag-grid-react",
+      "version": "36.3.0",
+      "bom-ref": "npm:node_modules/ag-grid-react",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:npm/ag-grid-react@36.3.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "ag-stack",
+      "version": "36.3.0",
+      "bom-ref": "npm:node_modules/ag-stack",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:npm/ag-stack@36.3.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "alembic",
+      "version": "1.20.1",
+      "bom-ref": "pypi:alembic",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:pypi/alembic@1.20.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "altgraph",
+      "version": "0.17.5",
+      "bom-ref": "pypi:altgraph",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:pypi/altgraph@0.17.5"
+    },
+    {
+      "type": "library",
+      "name": "annotated-doc",
+      "version": "0.0.6",
+      "bom-ref": "pypi:annotated-doc",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:pypi/annotated-doc@0.0.6",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "annotated-types",
+      "version": "0.8.0",
+      "bom-ref": "pypi:annotated-types",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:pypi/annotated-types@0.8.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "anyio",
+      "version": "4.16.0",
+      "bom-ref": "pypi:anyio",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:pypi/anyio@4.16.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "bottle",
+      "version": "0.13.4",
+      "bom-ref": "pypi:bottle",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:pypi/bottle@0.13.4"
+    },
+    {
+      "type": "library",
+      "name": "cffi",
+      "version": "2.1.1",
+      "bom-ref": "pypi:cffi",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:pypi/cffi@2.1.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT-0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "click",
+      "version": "8.5.1",
+      "bom-ref": "pypi:click",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:pypi/click@8.5.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD-3-Clause"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "clr_loader",
+      "version": "0.3.1",
+      "bom-ref": "pypi:clr-loader",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:pypi/clr-loader@0.3.1"
+    },
+    {
+      "type": "library",
+      "name": "cookie",
+      "version": "1.1.1",
+      "bom-ref": "npm:node_modules/cookie",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:npm/cookie@1.1.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "csstype",
+      "version": "3.2.3",
+      "bom-ref": "npm:node_modules/csstype",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:npm/csstype@3.2.3",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "et_xmlfile",
+      "version": "2.0.0",
+      "bom-ref": "pypi:et-xmlfile",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:pypi/et-xmlfile@2.0.0"
+    },
+    {
+      "type": "library",
+      "name": "fastapi",
+      "version": "0.162.5",
+      "bom-ref": "pypi:fastapi",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:pypi/fastapi@0.162.5",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "h11",
+      "version": "0.16.0",
+      "bom-ref": "pypi:h11",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:pypi/h11@0.16.0"
+    },
+    {
+      "type": "library",
+      "name": "idna",
+      "version": "3.20",
+      "bom-ref": "pypi:idna",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:pypi/idna@3.20",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD-3-Clause"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "js-tokens",
+      "version": "4.0.0",
+      "bom-ref": "npm:node_modules/js-tokens",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:npm/js-tokens@4.0.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "loose-envify",
+      "version": "1.4.0",
+      "bom-ref": "npm:node_modules/loose-envify",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:npm/loose-envify@1.4.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "object-assign",
+      "version": "4.1.1",
+      "bom-ref": "npm:node_modules/object-assign",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:npm/object-assign@4.1.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "openpyxl",
+      "version": "3.1.5",
+      "bom-ref": "pypi:openpyxl",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:pypi/openpyxl@3.1.5"
+    },
+    {
+      "type": "library",
+      "name": "opentelemetry-api",
+      "version": "1.45.2",
+      "bom-ref": "pypi:opentelemetry-api",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:pypi/opentelemetry-api@1.45.2",
+      "licenses": [
+        {
+          "license": {
+            "name": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "packaging",
+      "version": "26.3",
+      "bom-ref": "pypi:packaging",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:pypi/packaging@26.3",
+      "licenses": [
+        {
+          "license": {
+            "name": "Apache-2.0 OR BSD-2-Clause"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "pefile",
+      "version": "2024.8.26",
+      "bom-ref": "pypi:pefile",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:pypi/pefile@2024.8.26"
+    },
+    {
+      "type": "library",
+      "name": "pillow",
+      "version": "13.0.0",
+      "bom-ref": "pypi:pillow",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:pypi/pillow@13.0.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT-CMU"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "prop-types",
+      "version": "15.8.1",
+      "bom-ref": "npm:node_modules/prop-types",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:npm/prop-types@15.8.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "proxy_tools",
+      "version": "0.1.0",
+      "bom-ref": "pypi:proxy-tools",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:pypi/proxy-tools@0.1.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD-2-Clause"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "pycparser",
+      "version": "3.12",
+      "bom-ref": "pypi:pycparser",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:pypi/pycparser@3.12",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD-3-Clause"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "pydantic",
+      "version": "2.14.3",
+      "bom-ref": "pypi:pydantic",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:pypi/pydantic@2.14.3",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "pydantic_core",
+      "version": "2.50.4",
+      "bom-ref": "pypi:pydantic-core",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:pypi/pydantic-core@2.50.4",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "pyinstaller",
+      "version": "6.22.3",
+      "bom-ref": "pypi:pyinstaller",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:pypi/pyinstaller@6.22.3"
+    },
+    {
+      "type": "library",
+      "name": "pyinstaller-hooks-contrib",
+      "version": "2026.10",
+      "bom-ref": "pypi:pyinstaller-hooks-contrib",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:pypi/pyinstaller-hooks-contrib@2026.10"
+    },
+    {
+      "type": "library",
+      "name": "pypdfium2",
+      "version": "5.13.0",
+      "bom-ref": "pypi:pypdfium2",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:pypi/pypdfium2@5.13.0"
+    },
+    {
+      "type": "library",
+      "name": "pythonnet",
+      "version": "3.2.1",
+      "bom-ref": "pypi:pythonnet",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:pypi/pythonnet@3.2.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "pywebview",
+      "version": "6.2.1",
+      "bom-ref": "pypi:pywebview",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:pypi/pywebview@6.2.1"
+    },
+    {
+      "type": "library",
+      "name": "pywin32-ctypes",
+      "version": "0.2.3",
+      "bom-ref": "pypi:pywin32-ctypes",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:pypi/pywin32-ctypes@0.2.3"
+    },
+    {
+      "type": "library",
+      "name": "react",
+      "version": "19.3.1",
+      "bom-ref": "npm:node_modules/react",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:npm/react@19.3.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "react-dom",
+      "version": "19.3.1",
+      "bom-ref": "npm:node_modules/react-dom",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:npm/react-dom@19.3.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "react-is",
+      "version": "16.13.1",
+      "bom-ref": "npm:node_modules/react-is",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:npm/react-is@16.13.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "react-router",
+      "version": "7.18.5",
+      "bom-ref": "npm:node_modules/react-router",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:npm/react-router@7.18.5",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "react-router-dom",
+      "version": "7.18.5",
+      "bom-ref": "npm:node_modules/react-router-dom",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:npm/react-router-dom@7.18.5",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "scheduler",
+      "version": "0.28.0",
+      "bom-ref": "npm:node_modules/scheduler",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ],
+      "purl": "pkg:npm/scheduler@0.28.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "set-cookie-parser",
+      "version": "2.7.3",
+      "bom-ref": "npm:node_modules/set-cookie-parser",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:npm/set-cookie-parser@2.7.3",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "setuptools",
+      "version": "84.2.1",
+      "bom-ref": "pypi:setuptools",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:pypi/setuptools@84.2.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "starlette",
+      "version": "1.10.0",
+      "bom-ref": "pypi:starlette",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:pypi/starlette@1.10.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD-3-Clause"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "typing-inspection",
+      "version": "0.4.5",
+      "bom-ref": "pypi:typing-inspection",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:pypi/typing-inspection@0.4.5",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "typing_extensions",
+      "version": "4.16.0",
+      "bom-ref": "pypi:typing-extensions",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:pypi/typing-extensions@4.16.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "PSF-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "tzdata",
+      "version": "2026.6",
+      "bom-ref": "pypi:tzdata",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:pypi/tzdata@2026.6"
+    },
+    {
+      "type": "library",
+      "name": "uvicorn",
+      "version": "0.54.0",
+      "bom-ref": "pypi:uvicorn",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "false"
+        }
+      ],
+      "purl": "pkg:pypi/uvicorn@0.54.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD-3-Clause"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "PDFium",
+      "version": "153.0.7999.0",
+      "bom-ref": "runtime:pdfium",
+      "properties": [
+        {
+          "name": "epms:observed-in-build",
+          "value": "true"
+        }
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "ref": "epms",
+      "dependsOn": [
+        "npm:node_modules/@tanstack/react-query",
+        "npm:node_modules/ag-grid-community",
+        "npm:node_modules/ag-grid-react",
+        "npm:node_modules/react",
+        "npm:node_modules/react-dom",
+        "npm:node_modules/react-router-dom",
+        "pypi:alembic",
+        "pypi:fastapi",
+        "pypi:openpyxl",
+        "pypi:pillow",
+        "pypi:pypdfium2",
+        "pypi:pywebview",
+        "pypi:sqlalchemy",
+        "pypi:tzdata",
+        "pypi:uvicorn",
+        "runtime:cpython"
+      ]
+    },
+    {
+      "ref": "npm:node_modules/@tanstack/query-core",
+      "dependsOn": []
+    },
+    {
+      "ref": "npm:node_modules/@tanstack/react-query",
+      "dependsOn": [
+        "npm:node_modules/@tanstack/query-core",
+        "npm:node_modules/@types/react",
+        "npm:node_modules/react"
+      ]
+    },
+    {
+      "ref": "npm:node_modules/@types/react",
+      "dependsOn": [
+        "npm:node_modules/csstype"
+      ]
+    },
+    {
+      "ref": "runtime:cpython",
+      "dependsOn": []
+    },
+    {
+      "ref": "pypi:mako",
+      "dependsOn": [
+        "pypi:markupsafe"
+      ]
+    },
+    {
+      "ref": "pypi:markupsafe",
+      "dependsOn": []
+    },
+    {
+      "ref": "pypi:sqlalchemy",
+      "dependsOn": [
+        "pypi:typing-extensions"
+      ]
+    },
+    {
+      "ref": "npm:node_modules/ag-charts-types",
+      "dependsOn": []
+    },
+    {
+      "ref": "npm:node_modules/ag-grid-community",
+      "dependsOn": [
+        "npm:node_modules/ag-charts-types",
+        "npm:node_modules/ag-stack"
+      ]
+    },
+    {
+      "ref": "npm:node_modules/ag-grid-react",
+      "dependsOn": [
+        "npm:node_modules/ag-grid-community",
+        "npm:node_modules/prop-types",
+        "npm:node_modules/react",
+        "npm:node_modules/react-dom"
+      ]
+    },
+    {
+      "ref": "npm:node_modules/ag-stack",
+      "dependsOn": []
+    },
+    {
+      "ref": "pypi:alembic",
+      "dependsOn": [
+        "pypi:mako",
+        "pypi:sqlalchemy",
+        "pypi:typing-extensions"
+      ]
+    },
+    {
+      "ref": "pypi:altgraph",
+      "dependsOn": []
+    },
+    {
+      "ref": "pypi:annotated-doc",
+      "dependsOn": []
+    },
+    {
+      "ref": "pypi:annotated-types",
+      "dependsOn": []
+    },
+    {
+      "ref": "pypi:anyio",
+      "dependsOn": [
+        "pypi:idna",
+        "pypi:typing-extensions"
+      ]
+    },
+    {
+      "ref": "pypi:bottle",
+      "dependsOn": []
+    },
+    {
+      "ref": "pypi:cffi",
+      "dependsOn": [
+        "pypi:pycparser"
+      ]
+    },
+    {
+      "ref": "pypi:click",
+      "dependsOn": []
+    },
+    {
+      "ref": "pypi:clr-loader",
+      "dependsOn": [
+        "pypi:cffi"
+      ]
+    },
+    {
+      "ref": "npm:node_modules/cookie",
+      "dependsOn": []
+    },
+    {
+      "ref": "npm:node_modules/csstype",
+      "dependsOn": []
+    },
+    {
+      "ref": "pypi:et-xmlfile",
+      "dependsOn": []
+    },
+    {
+      "ref": "pypi:fastapi",
+      "dependsOn": [
+        "pypi:annotated-doc",
+        "pypi:anyio",
+        "pypi:opentelemetry-api",
+        "pypi:pydantic",
+        "pypi:starlette",
+        "pypi:typing-extensions",
+        "pypi:typing-inspection"
+      ]
+    },
+    {
+      "ref": "pypi:h11",
+      "dependsOn": []
+    },
+    {
+      "ref": "pypi:idna",
+      "dependsOn": []
+    },
+    {
+      "ref": "npm:node_modules/js-tokens",
+      "dependsOn": []
+    },
+    {
+      "ref": "npm:node_modules/loose-envify",
+      "dependsOn": [
+        "npm:node_modules/js-tokens"
+      ]
+    },
+    {
+      "ref": "npm:node_modules/object-assign",
+      "dependsOn": []
+    },
+    {
+      "ref": "pypi:openpyxl",
+      "dependsOn": [
+        "pypi:et-xmlfile"
+      ]
+    },
+    {
+      "ref": "pypi:opentelemetry-api",
+      "dependsOn": [
+        "pypi:typing-extensions"
+      ]
+    },
+    {
+      "ref": "pypi:packaging",
+      "dependsOn": []
+    },
+    {
+      "ref": "pypi:pefile",
+      "dependsOn": []
+    },
+    {
+      "ref": "pypi:pillow",
+      "dependsOn": []
+    },
+    {
+      "ref": "npm:node_modules/prop-types",
+      "dependsOn": [
+        "npm:node_modules/loose-envify",
+        "npm:node_modules/object-assign",
+        "npm:node_modules/react-is"
+      ]
+    },
+    {
+      "ref": "pypi:proxy-tools",
+      "dependsOn": []
+    },
+    {
+      "ref": "pypi:pycparser",
+      "dependsOn": []
+    },
+    {
+      "ref": "pypi:pydantic",
+      "dependsOn": [
+        "pypi:annotated-types",
+        "pypi:pydantic-core",
+        "pypi:typing-extensions",
+        "pypi:typing-inspection"
+      ]
+    },
+    {
+      "ref": "pypi:pydantic-core",
+      "dependsOn": [
+        "pypi:typing-extensions"
+      ]
+    },
+    {
+      "ref": "pypi:pyinstaller",
+      "dependsOn": [
+        "pypi:altgraph",
+        "pypi:packaging",
+        "pypi:pefile",
+        "pypi:pyinstaller-hooks-contrib",
+        "pypi:pywin32-ctypes",
+        "pypi:setuptools"
+      ]
+    },
+    {
+      "ref": "pypi:pyinstaller-hooks-contrib",
+      "dependsOn": [
+        "pypi:packaging"
+      ]
+    },
+    {
+      "ref": "pypi:pypdfium2",
+      "dependsOn": [
+        "runtime:pdfium"
+      ]
+    },
+    {
+      "ref": "pypi:pythonnet",
+      "dependsOn": [
+        "pypi:clr-loader"
+      ]
+    },
+    {
+      "ref": "pypi:pywebview",
+      "dependsOn": [
+        "pypi:bottle",
+        "pypi:proxy-tools",
+        "pypi:pythonnet",
+        "pypi:typing-extensions"
+      ]
+    },
+    {
+      "ref": "pypi:pywin32-ctypes",
+      "dependsOn": []
+    },
+    {
+      "ref": "npm:node_modules/react",
+      "dependsOn": []
+    },
+    {
+      "ref": "npm:node_modules/react-dom",
+      "dependsOn": [
+        "npm:node_modules/react",
+        "npm:node_modules/scheduler"
+      ]
+    },
+    {
+      "ref": "npm:node_modules/react-is",
+      "dependsOn": []
+    },
+    {
+      "ref": "npm:node_modules/react-router",
+      "dependsOn": [
+        "npm:node_modules/cookie",
+        "npm:node_modules/react",
+        "npm:node_modules/react-dom",
+        "npm:node_modules/set-cookie-parser"
+      ]
+    },
+    {
+      "ref": "npm:node_modules/react-router-dom",
+      "dependsOn": [
+        "npm:node_modules/react",
+        "npm:node_modules/react-dom",
+        "npm:node_modules/react-router"
+      ]
+    },
+    {
+      "ref": "npm:node_modules/scheduler",
+      "dependsOn": []
+    },
+    {
+      "ref": "npm:node_modules/set-cookie-parser",
+      "dependsOn": []
+    },
+    {
+      "ref": "pypi:setuptools",
+      "dependsOn": []
+    },
+    {
+      "ref": "pypi:starlette",
+      "dependsOn": [
+        "pypi:anyio",
+        "pypi:typing-extensions"
+      ]
+    },
+    {
+      "ref": "pypi:typing-inspection",
+      "dependsOn": [
+        "pypi:typing-extensions"
+      ]
+    },
+    {
+      "ref": "pypi:typing-extensions",
+      "dependsOn": []
+    },
+    {
+      "ref": "pypi:tzdata",
+      "dependsOn": []
+    },
+    {
+      "ref": "pypi:uvicorn",
+      "dependsOn": [
+        "pypi:click",
+        "pypi:h11"
+      ]
+    },
+    {
+      "ref": "runtime:pdfium",
+      "dependsOn": []
+    }
+  ]
+}

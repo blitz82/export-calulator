@@ -304,3 +304,83 @@ test('원장 등록 중복과 정정 충돌을 화면에서 확인', async ({pag
   const updated = await (await page.request.get(path,{headers})).json()
   expect(updated.find((row: {id:number}) => row.id===original.id).scope).toBe('제외')
 })
+
+test('PDF 검토에서 원본 위치와 재인식 후보를 확인하고 값을 유지', async ({page,request}) => {
+  const {token} = await (await request.get('/api/session')).json()
+  await office(request,{'x-epms-token':token})
+  await page.route('**/ocr?name=*',route=>route.fulfill({json:{
+    id:99,approved:false,pages:[{
+      page:1,method:'PDF 텍스트',text:'',warning:'',
+      rows:[{number:'12345-26-012345X',line:'001',usd:'120',kg:'18'}],
+      evidence:[{usd:{box:[.3,.4,.5,.46],method:'PDF 텍스트',alternate:'121',page:2}}],
+    },{page:2,method:'PDF 텍스트',text:'',warning:'',rows:[]}],
+  }}))
+  await page.route(/\/ocr\/99\/page\/[12](?:\?rotation=90)?$/,route=>route.fulfill({
+    contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="400" height="500"><rect width="400" height="500" fill="white"/></svg>',
+  }))
+  await page.route('**/ocr/99/page/1/region?*',route=>route.fulfill({json:{text:'122',warning:''}}))
+  await page.goto('/#/lines')
+  await page.getByRole('button',{name:'PDF에서 가져오기'}).click()
+  const dialog = page.getByRole('dialog')
+  await dialog.locator('input[type=file]').setInputFiles({
+    name:'synthetic.pdf',mimeType:'application/pdf',buffer:Buffer.from('%PDF-synthetic'),
+  })
+  const amount = dialog.getByRole('textbox',{name:'품목란 FOB(USD)',exact:true})
+  await expect(amount).toHaveValue('120')
+  await expect(dialog.getByText('Windows OCR 후보 · 121')).toBeVisible()
+  await amount.focus()
+  await expect(dialog.getByRole('img',{name:'수출신고필증 원본 2쪽'})).toBeVisible()
+  await expect(dialog.locator('.ocr-location-active')).toBeVisible()
+  await dialog.getByRole('button',{name:'이 영역 재인식'}).click()
+  await expect(dialog.getByText('재인식 후보 · 122')).toBeVisible()
+  await expect(amount).toHaveValue('120')
+  await expect(dialog.getByRole('button',{name:'승인하고 원장에 등록'})).toBeDisabled()
+  await page.route('**/ocr/99/page/2/selection',route=>{
+    const {box} = route.request().postDataJSON() as {box:number[]}
+    expect(box).toHaveLength(4)
+    expect(box[2]).toBeGreaterThan(box[0])
+    expect(box[3]).toBeGreaterThan(box[1])
+    return route.fulfill({json:{text:'321',warning:''}})
+  })
+  await dialog.getByRole('button',{name:'오른쪽으로 90° 회전'}).click()
+  const preview = dialog.getByRole('img',{name:'수출신고필증 원본 2쪽'})
+  await expect(preview).toBeVisible()
+  await dialog.getByRole('button',{name:'원본 영역 지정'}).click()
+  const bounds = await preview.boundingBox()
+  if (!bounds) throw new Error('미리보기 위치가 없습니다.')
+  await page.mouse.move(bounds.x+30,bounds.y+30)
+  await page.mouse.down()
+  await page.mouse.move(bounds.x+80,bounds.y+70)
+  await page.mouse.up()
+  await dialog.getByRole('button',{name:'지정 영역 재인식'}).click()
+  await expect(dialog.getByText('재인식 후보 · 321')).toBeVisible()
+  await expect(amount).toHaveValue('120')
+  let version:{id:number;data:unknown;active:number;validated:number} | undefined
+  await page.route('**/ocr/profiles',route=>{
+    if (route.request().method()==='POST') {
+      const data = route.request().postDataJSON()
+      expect(data.regions[0].box).toHaveLength(4)
+      version = {id:1,data,active:0,validated:0}
+      return route.fulfill({json:{id:1}})
+    }
+    return route.fulfill({json:version ? [version] : []})
+  })
+  await page.route('**/ocr/profiles/1/preview?*',route=>{
+    if (version) version.validated=1
+    return route.fulfill({json:{passed:true,candidates:{number:{normalized:'12345-26-012345X',box:[.3,.4,.5,.46]}}}})
+  })
+  await page.route('**/ocr/profiles/1/activate',route=>{
+    if (version) version.active=1
+    return route.fulfill({json:{active:1}})
+  })
+  await dialog.getByText('고급 OCR 템플릿 설정',{exact:true}).click()
+  await dialog.getByRole('textbox',{name:'템플릿 JSON'}).fill('{"name":"시험","variant":"preloading-cover","regions":[]}')
+  await dialog.getByRole('button',{name:'선택 영역 추가'}).click()
+  await dialog.getByRole('button',{name:'새 버전 저장'}).click()
+  await expect(dialog.getByText('초안 버전을 저장했습니다.')).toBeVisible()
+  const activate = dialog.getByRole('button',{name:'이 버전 활성화'})
+  await expect(activate).toBeDisabled()
+  await dialog.getByRole('button',{name:'현재 쪽 미리보기'}).click()
+  await activate.click()
+  await expect(dialog.getByText('활성화했습니다.',{exact:false})).toBeVisible()
+})
