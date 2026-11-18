@@ -3,10 +3,10 @@ import type { PointerEvent } from 'react'
 import { request } from './api'
 import type { Fields, Problem, Row } from './grid'
 import { ProducerSelect } from './producer-select'
-import { OcrProfilePanel, variants } from './ocr-profile'
+import { OcrProfilePanel, variants, ocrFields } from './ocr-profile'
 import type { Box, Preview } from './ocr-profile'
 
-type Source = {box?:[number,number,number,number]; method?:string; alternate?:string; page?:number}
+type Source = {box?:Box; alternate?:string; page?:number}
 type Page = {page:number; method:string; text:string; warning:string; rows:Fields[]; evidence?:Record<string,Source>[];
   document_totals?:{total_kg?:string; fob_usd?:string}; template?:{variant:string}}
 type Document = {id:number; pages:Page[]; approved:boolean}
@@ -20,7 +20,19 @@ const choices:Record<string, string[]> = {
   agent_state:states, owner_state:states,
 }
 const numericFields = ['usd','kg'] as const
-const coreFields = ['number','line','declared','hs','usd','kg']
+const requiredFields = new Set(['number','line','version','shipped','hs','usd','kg','scope','status'])
+const fieldGroups = [
+  {title:'신고 기본정보', keys:['number','declared','accepted','shipped','country','version']},
+  {title:'품목 및 실적', keys:['line','product','hs','quantity','unit','kg','usd']},
+  {title:'업체 정보', roles:[
+    {title:'수출대행자', keys:['agent_name','agent','agent_state']},
+    {title:'수출화주', keys:['owner_name','owner','owner_state']},
+    {title:'제조자', keys:['maker_name','maker']},
+  ]},
+  {title:'등록 판단', keys:['scope','status']},
+]
+const orderedFields = fieldGroups.flatMap(group=>group.keys ?? group.roles?.flatMap(role=>role.keys) ?? [])
+const issueKey = (issue:ReviewIssue) => issue.field==='fob' ? 'usd' : issue.field==='maker_state' ? 'maker' : issue.field
 const rotated = ([x,y,r,b]:Box, angle:number):Box => {
   if (angle===90) return [1-b,x,1-y,r]
   if (angle===180) return [1-r,1-b,1-x,1-y]
@@ -47,12 +59,15 @@ export function OcrInput({org, fields, members, disabled, onSaved}: {
   const [message,setMessage] = useState('')
   const [issues,setIssues] = useState<ReviewIssue[]>([])
   const [focused,setFocused] = useState('')
-  const [region,setRegion] = useState('')
+  const [reading,setReading] = useState<{field:string; candidate?:string; message?:string}>()
+  const [dragBox,setDragBox] = useState<Box>()
+  const [managing,setManaging] = useState(false)
+  const [errorField,setErrorField] = useState<string>()
+  const previewArea = useRef<HTMLDivElement>(null)
   const [name,setName] = useState('')
   const [rotation,setRotation] = useState(0)
   const [selecting,setSelecting] = useState(false)
   const [selection,setSelection] = useState<Box>()
-  const [selectedRecognition,setSelectedRecognition] = useState<{box:Box; candidates:Fields}>()
   const [profilePreview,setProfilePreview] = useState<{file:number; page:number; fields:Preview}>()
   const start = useRef<[number,number] | null>(null)
   const highlight = useRef<HTMLButtonElement>(null)
@@ -67,8 +82,7 @@ export function OcrInput({org, fields, members, disabled, onSaved}: {
   useEffect(()=>{
     setImage('')
     setImageError('')
-    setSelection(undefined)
-    setSelectedRecognition(undefined)
+    clearReading()
     setProfilePreview(undefined)
     if (docId === undefined) return
     const controller = new AbortController()
@@ -89,14 +103,51 @@ export function OcrInput({org, fields, members, disabled, onSaved}: {
   }, [docId, pageNumber, prefix, rotation])
 
   useEffect(()=>{
-    highlight.current?.scrollIntoView({block:'nearest',inline:'nearest'})
-  }, [focused,image])
+    const box = highlight.current
+    const preview = previewArea.current
+    if (!box || !preview) return
+    const target = box.getBoundingClientRect()
+    const viewport = preview.getBoundingClientRect()
+    preview.scrollBy({
+      top:target.top + target.height / 2 - viewport.top - viewport.height / 2,
+      left:target.left + target.width / 2 - viewport.left - viewport.width / 2,
+    })
+  }, [focused,image,zoom])
+
+  useEffect(()=>{
+    if (!busy && errorField) {
+      dialog.current?.querySelector<HTMLElement>('#' + CSS.escape('ocr-' + errorField))?.focus()
+      setErrorField(undefined)
+    }
+  }, [busy,errorField])
+
+  function clearReading() {
+    setReading(undefined)
+    setSelecting(false)
+    setDragBox(undefined)
+    setSelection(undefined)
+    start.current = null
+  }
+
+  function beginReading(field?:string) {
+    clearReading()
+    setReading(field ? {field} : undefined)
+    setSelecting(true)
+    previewArea.current?.focus()
+    previewArea.current?.scrollIntoView({block:'nearest'})
+  }
+
+  function switchView(manage:boolean) {
+    clearReading()
+    setProfilePreview(undefined)
+    setManaging(manage)
+  }
 
   function selectRow(index:number) {
     setActive(index)
     setPageNumber(rows[index].page)
     setFocused('')
-    setRegion('')
+    clearReading()
   }
 
   async function upload(files:FileList) {
@@ -124,11 +175,11 @@ export function OcrInput({org, fields, members, disabled, onSaved}: {
       setDoc(result)
       setName(file.name)
       setRotation(0)
-      setSelecting(false)
+      setManaging(false)
       setRows(result.approved ? [] : initial)
       setActive(0)
       setFocused('')
-      setRegion('')
+      clearReading()
       setPageNumber(initial[0].page)
       setIssues([])
       if (result.approved) setMessage('이미 원장에 등록한 PDF입니다.')
@@ -145,7 +196,8 @@ export function OcrInput({org, fields, members, disabled, onSaved}: {
         verified_usd:next.usd===item.values.usd ? item.verified_usd : '',
         verified_kg:next.kg===item.values.kg ? item.verified_kg : ''}
     }))
-    setIssues([])
+    setIssues(current=>current.filter(issue=>issue.position!==active+1 ||
+      !(Object.hasOwn(values,issueKey(issue)) || Object.hasOwn(values,'scope') || Object.hasOwn(values,'status'))))
   }
 
   function updateField(field:string, value:string, fromOcr=false) {
@@ -158,61 +210,43 @@ export function OcrInput({org, fields, members, disabled, onSaved}: {
     update(role ? {[field]:value,[role+'_state']:''} : {[field]:value})
   }
 
-  async function recheck(field:string) {
-    if (!row || row.sourceIndex === undefined) return
-    setBusy(true)
-    setRegion('')
-    try {
-      const query = new URLSearchParams({row:String(row.sourceIndex), field})
-      const response = await request(`${prefix}/${docId}/page/${row.page}/region?${query}`, {method:'POST'})
-      const result:{text:string; warning:string} = await response.json()
-      setRegion(result.warning || (result.text ? `재인식 후보 · ${result.text}` : '선택 영역에서 문자를 읽지 못했습니다.'))
-    } catch (error) {
-      setRegion((error as Error).message)
-    } finally { setBusy(false) }
-  }
-
   function point(event:PointerEvent<HTMLDivElement>):[number,number] {
     const rect = event.currentTarget.getBoundingClientRect()
     return [Math.max(0,Math.min(1,(event.clientX-rect.left)/rect.width)),
       Math.max(0,Math.min(1,(event.clientY-rect.top)/rect.height))]
   }
 
-  async function recheckSelection() {
-    if (!selection) return
+  async function readSelection(box:Box, field:string) {
     setBusy(true)
-    setRegion('')
-    setSelectedRecognition(undefined)
     try {
-      const response = await request(`${prefix}/${docId}/page/${pageNumber}/selection`,{
-        method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({box:selection}),
+      const response = await request(prefix + '/' + docId + '/page/' + pageNumber + '/selection',{
+        method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({box}),
       })
       const result:{text:string;warning:string;candidates?:Fields} = await response.json()
-      setRegion(result.warning || (result.text ? `재인식 후보 · ${result.text}` : '선택 영역에서 문자를 읽지 못했습니다.'))
-      if (!result.warning && result.text) setSelectedRecognition({box:selection,candidates:result.candidates ?? {}})
-    } catch (error) { setRegion((error as Error).message) }
-    finally { setBusy(false) }
+      const candidate = result.warning ? undefined : result.candidates?.[field]
+      const message = result.warning || (candidate ? undefined : result.text
+        ? '이 입력칸에 맞는 값을 찾지 못했습니다.'
+        : '선택 영역에서 문자를 읽지 못했습니다.')
+      setReading({field,candidate,message})
+    } catch (error) {
+      setReading({field,message:(error as Error).message})
+    } finally { setBusy(false) }
   }
 
-  async function approve(validateOnly=false) {
+  async function approve() {
     setBusy(true)
     setMessage('')
     setIssues([])
     try {
-      const url = `${prefix}/${docId}/approve${validateOnly ? '?validate_only=true' : ''}`
-      const response = await request(url, {
+      const response = await request(prefix + '/' + docId + '/approve', {
         method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(rows),
       }, [422])
       const result = await response.json()
       if (!response.ok) {
         const errors:ReviewIssue[] = result.issues ?? []
         setIssues(errors)
-        if (errors.length) selectRow(errors[0].position-1)
+        if (errors.length) goToIssue(errors[0])
         setMessage(result.detail ?? `승인을 차단하는 오류 ${errors.length}개를 확인하세요.`)
-        return
-      }
-      if (validateOnly) {
-        setMessage('검증을 통과했습니다. 원본 대조 후 승인할 수 있습니다.')
         return
       }
       setRows([])
@@ -231,13 +265,133 @@ export function OcrInput({org, fields, members, disabled, onSaved}: {
     setRows([])
     setIssues([])
     setMessage('')
+    switchView(false)
     dragDepth.current = 0
     setDragging(false)
   }
 
-  const verified = rows.length > 0 && rows.every(item=>item.verified_usd && item.verified_kg)
-  const orderedFields = ['number','line','serial','version','hs','usd','kg','declared','shipped','accepted',
-    ...Object.keys(fields).filter(key=>!['number','line','version','hs','usd','kg','declared','shipped','accepted','fob','maker_state'].includes(key))]
+  function viewEvidence(evidence:Source | undefined, fallback=row?.page) {
+    if (evidence?.box && fallback !== undefined) setPageNumber(evidence.page ?? fallback)
+  }
+
+  function openField(key:string, focusInput=false) {
+    if (key !== focused) clearReading()
+    setFocused(key)
+    viewEvidence(source?.[key])
+    if (focusInput) setErrorField(key)
+  }
+
+  function goToIssue(issue:ReviewIssue) {
+    const index = issue.position-1
+    const key = issueKey(issue)
+    selectRow(index)
+    setFocused(key)
+    setErrorField(key)
+    const target = rows[index]
+    if (target.sourceIndex !== undefined) {
+      viewEvidence(doc?.pages[target.page-1]?.evidence?.[target.sourceIndex]?.[key],target.page)
+    }
+  }
+
+  const hasOtherIssueRows = new Set(issues.map(issue=>issue.position)).size>1
+  const activeBox = dragBox ?? (selection && rotated(selection,rotation))
+  const excluded = row?.values.scope==='제외' || row?.values.status==='취소'
+  const showVersion = !!row && (row.values.version!=='1' || focused==='version' ||
+    currentIssues.some(issue=>issueKey(issue)==='version'))
+  const needsAttention = row ? orderedFields.filter(key=> {
+    if (currentIssues.some(issue=>issueKey(issue)===key)) return true
+    if (key==='kg' || key==='usd') return !row[key==='kg' ? 'verified_kg' : 'verified_usd']
+    if (excluded) return false
+    if ((key==='scope' || key==='status') && row.values[key]==='미확정') return true
+    const original = row.sourceIndex===undefined ? undefined : rowPage?.rows[row.sourceIndex]?.[key]
+    return (requiredFields.has(key) && !row.values[key]?.trim()) ||
+      (!!source?.[key]?.alternate && row.values[key]===original)
+  }) : []
+
+  function nextAttention() {
+    const position = orderedFields.indexOf(focused)
+    const next = needsAttention.find(key=>orderedFields.indexOf(key)>position) ?? needsAttention[0]
+    if (next) openField(next,true)
+  }
+
+  function fieldRow(key:string) {
+    if (!row) return null
+    const problems = currentIssues.filter(issue=>issueKey(issue)===key)
+    const label = key==='usd' ? '품목란 FOB(USD)' : key==='line' ? '품목란 번호' : fields[key]
+    const id = 'ocr-' + key
+    const value = row.values[key] ?? ''
+    const original = row.sourceIndex===undefined ? undefined : rowPage?.rows[row.sourceIndex]?.[key]
+    const picked = source?.[key]
+    const numeric = numericFields.find(field=>field===key)
+    const verified = numeric && !!row[numeric==='usd' ? 'verified_usd' : 'verified_kg']
+    const mismatch = !verified && !!picked?.alternate && value===original
+    const undecided = !excluded && (key==='scope' || key==='status') && value==='미확정'
+    const required = requiredFields.has(key) && (!excluded || !!numeric)
+    const status = problems.length || undecided ? '확인 필요' : !value ? (required ? '입력 필요' : '미입력') :
+      mismatch ? '값 불일치' : numeric ? (verified ? '확인 완료' : '원본 확인 필요') : ''
+    const alerted = !!problems.length || undecided || (required && !value) || mismatch || (!!numeric && !verified)
+    const expanded = focused===key
+    return <div className={'ocr-field-row' + (expanded ? ' ocr-field-open' : '')} key={key}>
+      <button type="button" className="ocr-field-summary" aria-expanded={expanded} aria-controls={id + '-editor'}
+        onClick={()=>{
+          if (expanded) {
+            setFocused('')
+            clearReading()
+          } else openField(key,true)
+        }}>
+        <span>{label}</span>
+        <span className={numeric || key==='quantity' ? 'ocr-number' : undefined}>{value || '—'}</span>
+        <span className={alerted ? 'ocr-field-alert' : 'ocr-field-state'}>{status}</span>
+      </button>
+      <div id={id + '-editor'} className="ocr-field-editor" hidden={!expanded}>
+        {expanded && <>
+          {key==='maker' && <ProducerSelect members={members} onSelect={member=>
+            update({maker:String(member.number),maker_name:String(member.name),maker_state:''})}/>}
+          {choices[key] ? <select id={id} aria-label={label} value={value} onChange={e=>update({[key]:e.target.value})}
+            aria-invalid={!!problems.length} aria-describedby={problems.length ? id + '-issues' : undefined}>
+            <option value="">{key.endsWith('_state') ? '회원 명부 대조' : '선택'}</option>
+            {choices[key].map(option=><option key={option}>{option}</option>)}
+          </select> : <input id={id} aria-label={label} value={value}
+            aria-invalid={!!problems.length} aria-describedby={problems.length ? id + '-issues' : undefined}
+            onChange={e=>updateField(key,e.target.value)}/>}
+          {key==='scope' && <small>이 품목란이 공동정산에 포함되는지 선택하세요.</small>}
+          {mismatch && <small>다른 추출 후보 · {picked.alternate}</small>}
+          {numeric && <label className="ocr-confirm">
+            <input type="checkbox" checked={verified} disabled={!value.trim()}
+              onChange={event=>{
+                const checked = event.target.checked
+                setRows(current=>current.map((item,index)=>index===active ?
+                  {...item,[`verified_${numeric}`]:checked ? value : ''} : item))
+                setIssues(current=>current.filter(issue=>issue.position!==active+1 || issueKey(issue)!==key))
+              }}/>{label} 원본 확인
+          </label>}
+          {Object.hasOwn(ocrFields,key) && <div className="toolbar ocr-field-tools">
+            {picked?.box ? <button type="button" onClick={()=>{
+              viewEvidence(source?.[key])
+              highlight.current?.scrollIntoView({block:'center',inline:'center'})
+            }}>원본 위치 보기</button> : <small>원본 위치 없음</small>}
+            <button type="button" disabled={!image} aria-label={label + ' PDF에서 읽기'}
+              aria-pressed={selecting && reading?.field===key} onClick={()=>beginReading(key)}>PDF에서 읽기</button>
+          </div>}
+          {reading?.field===key && <div className="ocr-field-candidate" aria-live="polite">
+            {busy && <small>선택 영역을 읽는 중…</small>}
+            {reading.message && <small>{reading.message} 원본을 보고 직접 입력할 수 있습니다.</small>}
+            {reading.candidate && <><span>후보 · {reading.candidate}</span>{' '}
+              <button type="button" onClick={()=>{
+                if (!reading.candidate) return
+                updateField(key,reading.candidate,true)
+                clearReading()
+                setErrorField(key)
+              }}>후보 사용</button></>}
+          </div>}
+          {!!problems.length && <div className="ocr-field-alert" id={id + '-issues'}>
+            {problems.map((problem,index)=><small key={index}>{problem.message}</small>)}
+          </div>}
+        </>}
+      </div>
+    </div>
+  }
+
   return <>
     <button type="button" disabled={disabled} onClick={()=>dialog.current?.showModal()}>PDF에서 가져오기</button>
     <dialog ref={dialog} className="ocr-dialog" aria-labelledby="ocr-title"
@@ -260,15 +414,22 @@ export function OcrInput({org, fields, members, disabled, onSaved}: {
         event.preventDefault()
         dragDepth.current = 0
         setDragging(false)
-        void upload(event.dataTransfer.files)
+        if (!managing) void upload(event.dataTransfer.files)
       }}
-      onCancel={event=>{event.preventDefault(); close()}}>
+      onCancel={event=>{
+        event.preventDefault()
+        if (selecting) clearReading()
+        else close()
+      }}>
       <header className="toolbar">
-        <h2 id="ocr-title">PDF에서 가져오기</h2>
+        <h2 id="ocr-title">{managing ? "OCR 서식 관리" : "PDF에서 가져오기"}</h2>
         <span className="toolbar-spacer"/>
+        {doc && <button type="button" disabled={busy} onClick={()=>switchView(!managing)}>
+          {managing ? 'PDF 검토로 돌아가기' : 'OCR 서식 관리'}
+        </button>}
         <button type="button" disabled={busy} onClick={close}>닫기</button>
       </header>
-      <div className={`ocr-upload${dragging && !busy ? ' ocr-upload-active' : ''}`}>
+      {!managing && <><div className={`ocr-upload${dragging && !busy ? ' ocr-upload-active' : ''}`}>
         <p>수출신고필증 PDF를 여기에 끌어다 놓으세요.</p>
         <button type="button" autoFocus disabled={busy} onClick={()=>fileInput.current?.click()}>파일 찾기</button>
         <input ref={fileInput} type="file" hidden aria-label="수출신고필증 PDF" accept=".pdf,application/pdf" disabled={busy}
@@ -278,8 +439,8 @@ export function OcrInput({org, fields, members, disabled, onSaved}: {
             event.currentTarget.value = ''
           }}/>
       </div>
-      <p>전자 PDF와 종이 신고필증을 스캔한 PDF를 올릴 수 있습니다. 사진이나 JPG·PNG 같은 이미지 파일은 PDF로 변환한 뒤 올리세요. 정확한 추출을 위해 <strong>UNI-PASS 전자 PDF</strong>를 권장합니다.</p>
-      <p>등록하기 전에 <strong>모든 추출값을 원본과 반드시 대조</strong>하고, 빠지거나 잘못 읽힌 값은 수정하세요. 금액과 순중량의 원본 확인란을 체크한 뒤 승인하세요.</p>
+      {!doc && <p>수출신고필증 PDF를 올려 주세요. <strong>UNI-PASS 전자 PDF</strong>를 사용하면 더 정확하게 추출할 수 있습니다.</p>}
+      <p>등록하기 전에 <strong>모든 추출값을 원본과 반드시 대조</strong>하고, 빠지거나 잘못 읽힌 값은 수정하세요. 금액과 순중량의 원본 확인란을 체크한 뒤 승인하세요.</p></>}
       {busy && <p role="status">PDF 또는 승인 요청을 처리하고 있습니다…</p>}
       {message && <p role="alert">{message}</p>}
       {doc && <>
@@ -287,24 +448,33 @@ export function OcrInput({org, fields, members, disabled, onSaved}: {
         <div className="ocr-panels">
         <section aria-label="원본 PDF">
           <div className="toolbar">
-            <button aria-label="이전 쪽" disabled={pageNumber<=1} onClick={()=>setPageNumber(pageNumber-1)}>이전</button>
+            <button aria-label="이전 쪽" disabled={busy || pageNumber<=1} onClick={()=>setPageNumber(pageNumber-1)}>이전</button>
             <span>{pageNumber} / {doc.pages.length}쪽</span>
-            <button aria-label="다음 쪽" disabled={pageNumber>=doc.pages.length} onClick={()=>setPageNumber(pageNumber+1)}>다음</button>
+            <button aria-label="다음 쪽" disabled={busy || pageNumber>=doc.pages.length} onClick={()=>setPageNumber(pageNumber+1)}>다음</button>
             <label>확대 <select value={zoom} onChange={e=>setZoom(Number(e.target.value))}>
               {[75,100,125,150,200].map(value=><option key={value} value={value}>{value}%</option>)}
             </select></label>
-            <button type="button" onClick={()=>setRotation((rotation+90)%360)}>오른쪽으로 90° 회전</button>
-            {!doc.approved && <button type="button" aria-pressed={selecting} onClick={()=>setSelecting(!selecting)}>원본 영역 지정</button>}
-            {selection && <button type="button" disabled={busy} onClick={()=>void recheckSelection()}>지정 영역 재인식</button>}
+            <button type="button" disabled={busy} onClick={()=>setRotation((rotation+90)%360)}>오른쪽으로 90° 회전</button>
+            {managing && <button type="button" disabled={!image || busy} aria-pressed={selecting}
+              onClick={()=>selecting ? clearReading() : beginReading()}>원본 영역 지정</button>}
           </div>
-          {page?.template && <p>{variants[page.template.variant] ?? '수출신고필증'} · {page.method}</p>}
-          {selection && region && <p role="status">{region}</p>}
-          <div className="ocr-page">
+          {managing && page?.template && <p>{variants[page.template.variant] ?? '수출신고필증'} · {page.method}</p>}
+          {selecting && <div className="toolbar">
+            <span role="status">{reading ? ocrFields[reading.field] + ' 값이 있는 영역을 드래그하세요.' : '서식에 저장할 영역을 드래그하세요.'}</span>
+            <button type="button" onClick={clearReading}>영역 지정 취소</button>
+          </div>}
+          <div className="ocr-page" ref={previewArea} tabIndex={-1} aria-label="PDF 미리보기">
             {image ? <div className={`ocr-image${selecting ? ' ocr-selecting' : ''}`} style={{width:`${zoom}%`}}
               onPointerDown={event=>{
                 if (!selecting || event.button!==0) return
                 start.current = point(event)
                 event.currentTarget.setPointerCapture(event.pointerId)
+              }}
+              onPointerMove={event=>{
+                if (!start.current) return
+                const [a,b] = start.current
+                const [x,y] = point(event)
+                setDragBox([Math.min(x,a),Math.min(y,b),Math.max(x,a),Math.max(y,b)])
               }}
               onPointerUp={event=>{
                 const origin = start.current
@@ -312,24 +482,26 @@ export function OcrInput({org, fields, members, disabled, onSaved}: {
                 if (!selecting || !origin) return
                 const [x,y] = point(event)
                 const [a,b] = origin
+                setDragBox(undefined)
                 if (Math.abs(x-a)<.002 || Math.abs(y-b)<.002) return
-                setSelection(rotated([Math.min(x,a),Math.min(y,b),Math.max(x,a),Math.max(y,b)],(360-rotation)%360))
-                setRegion('')
+                const box = rotated([Math.min(x,a),Math.min(y,b),Math.max(x,a),Math.max(y,b)],(360-rotation)%360)
+                setSelection(box)
                 setSelecting(false)
+                if (reading) void readSelection(box,reading.field)
               }}
-              onPointerCancel={()=>{start.current=null}}>
+              onPointerCancel={()=>{start.current=null; setDragBox(undefined)}}>
               <img alt={`수출신고필증 원본 ${pageNumber}쪽`} src={image} draggable={false}/>
-              {selection && <span className="ocr-selected-box" style={boxStyle(rotated(selection,rotation))}/>}
+              {activeBox && <span className="ocr-selected-box" style={boxStyle(activeBox)}/>}
               {profilePreview?.file===doc.id && profilePreview.page===pageNumber &&
                 Object.entries(profilePreview.fields).map(([key,item])=><span className="ocr-selected-box" key={key}
                   title={fields[key] ?? key} style={boxStyle(rotated(item.box,rotation))}/>)}
               {Object.entries(source ?? {}).map(([key,item])=>{
-                if (selecting || !item.box || pageNumber !== (item.page ?? row?.page)) return null
+                if (managing || selecting || !orderedFields.includes(key) || !item.box || pageNumber !== (item.page ?? row?.page)) return null
                 return <button type="button" key={key} ref={focused===key ? highlight : null}
                   className={`ocr-location${focused===key ? ' ocr-location-active' : ''}`}
                   aria-label={`${key==='serial' ? '일련번호' : fields[key] ?? key} 원본 위치`}
                   style={boxStyle(rotated(item.box,rotation))}
-                  onClick={()=>document.getElementById(`ocr-${key}`)?.focus()}/>
+                  onClick={()=>{if (orderedFields.includes(key)) openField(key,true)}}/>
               })}
             </div>
               : <p role={imageError?'alert':'status'}>{imageError || '원본을 불러오는 중…'}</p>}
@@ -339,9 +511,17 @@ export function OcrInput({org, fields, members, disabled, onSaved}: {
             문서 전체 합계{page.document_totals.total_kg && ` · 총중량 ${page.document_totals.total_kg} kg`}
             {page.document_totals.fob_usd && ` · 총 FOB ${page.document_totals.fob_usd} USD`}
           </p>}
-          {!!page?.text && <details><summary>추출 문자 보기 · {page.method}</summary><pre>{page.text}</pre></details>}
+          {managing && !!page?.text && <details><summary>추출 문자 보기 · {page.method}</summary><pre>{page.text}</pre></details>}
         </section>
-        {!doc.approved && <section aria-label="품목란 검토">
+        {managing ? <OcrProfilePanel key={prefix + '/' + doc.id} prefix={prefix} file={doc.id} page={pageNumber}
+          reviewBusy={busy} variant={page?.template?.variant} scan={page?.method?.includes('Windows OCR') ?? false}
+          selection={selection} onBusyChange={setBusy} onPreview={fields=>setProfilePreview({file:doc.id,page:pageNumber,fields})}/>
+          : !doc.approved && <section className="ocr-review" aria-label="품목란 검토">
+          <div className="ocr-review-heading">
+          {row && <div className="ocr-review-context">
+            <strong>신고번호 {row.values.number || '미입력'}</strong>
+            <span>품목란 {row.values.line || '미입력'} · 원본 {row.page}쪽</span>
+          </div>}
           <div className="toolbar">
             <label>검토 품목란 <select value={active} disabled={busy} onChange={e=>selectRow(Number(e.target.value))}>
               {rows.map((item,index)=><option key={index} value={index}>
@@ -349,12 +529,16 @@ export function OcrInput({org, fields, members, disabled, onSaved}: {
               </option>)}
             </select></label>
             <button disabled={busy || rows.length>=300} onClick={()=>{
+              clearReading()
+              setFocused('')
               setActive(rows.length)
               const header = page?.rows.length===1 ? page.rows[0] : undefined
               setRows([...rows,makeRow(pageNumber,header?.line?{}:header)])
               setIssues([])
             }}>현재 쪽 품목란 추가</button>
             <button disabled={busy || rows.length<=1} onClick={()=>{
+              clearReading()
+              setFocused('')
               const next = rows.filter((_,index)=>index!==active)
               const index = Math.min(active,next.length-1)
               setRows(next)
@@ -363,73 +547,36 @@ export function OcrInput({org, fields, members, disabled, onSaved}: {
               setIssues([])
             }}>현재 품목란 제외</button>
           </div>
-          {row && <fieldset disabled={busy}>
-            <legend>{row.page}쪽 품목란 입력</legend>
-            <p>자동추출 {Object.keys(rowPage?.rows[row.sourceIndex ?? -1] ?? {}).length}개 ·
-              미인식 {coreFields.filter(key=>!row.values[key]).length}개 ·
-              확인필요 {currentIssues.length + Object.values(source ?? {}).filter(item=>!!item.alternate).length}개</p>
-            <div className="ocr-fields">
-              {orderedFields.map(key=>{
-                const problems = currentIssues.filter(issue=>issue.field===key)
-                const label = key==='usd'?'품목란 FOB(USD)':key==='serial'?'일련번호':fields[key]
-                const id = `ocr-${key}`
-                const value = row.values[key] ?? ''
-                const original = row.sourceIndex===undefined ? undefined : rowPage?.rows[row.sourceIndex]?.[key]
-                const picked = source?.[key]
-                return <div key={key}>
-                  {key==='maker' && <ProducerSelect members={members} onSelect={member=>
-                    update({maker:String(member.number),maker_name:String(member.name),maker_state:''})}/>}
-                  <label htmlFor={id}>{label}</label>
-                  {choices[key] ? <select id={id} value={value} onChange={e=>update({[key]:e.target.value})}
-                    aria-invalid={!!problems.length}>
-                    <option value="">{key.endsWith('_state')?'회원 명부 대조':'선택'}</option>
-                    {choices[key].map(option=><option key={option}>{option}</option>)}
-                  </select> : <input id={id} value={value} readOnly={key==='serial'} aria-invalid={!!problems.length}
-                    onFocus={()=>{
-                      setFocused(key)
-                      setRegion('')
-                      if (picked?.box) setPageNumber(picked.page ?? row.page)
-                    }}
-                    onChange={e=>updateField(key,e.target.value)}/>}
-                  {(original!==undefined || [...coreFields,'serial'].includes(key)) &&
-                    <small>{(key==='usd' && row.verified_usd) || (key==='kg' && row.verified_kg) ? '확인완료' :
-                      problems.length ? '확인필요' : original!==undefined && value!==original ? '수동 수정' :
-                      picked?.alternate ? '충돌' : original ? `자동 추출${picked?.method ? ` · ${picked.method}` : ''}` :
-                        value ? '수동 입력' : '미인식'}</small>}
-                  {picked?.alternate && <small>Windows OCR 후보 · {picked.alternate}</small>}
-                  {picked?.box && focused===key && <button type="button" onClick={()=>void recheck(key)}>이 영역 재인식</button>}
-                  {focused===key && region && !selection && <small role="status">{region}</small>}
-                  {numericFields.map(field=>field===key && <label className="ocr-confirm" key={field}>
-                    <input type="checkbox" checked={!!row[`verified_${field}`]} disabled={!value.trim()}
-                      onChange={event=>{
-                        const checked = event.target.checked
-                        setRows(current=>current.map((item,index)=>index===active ?
-                          {...item,[`verified_${field}`]:checked ? value : ''} : item))
-                        setIssues([])
-                      }}/> {label} 원본 확인
-                  </label>)}
-                  {problems.map((problem,index)=><small key={index}>{problem.message}</small>)}
-                </div>
-              })}
-            </div>
+          {row && <div className="ocr-review-progress">
+            <span role="status">확인 필요 {needsAttention.length}개</span>
+            <button type="button" disabled={busy || !needsAttention.length} onClick={nextAttention}>다음 확인 항목</button>
+          </div>}
+          </div>
+          {row && <fieldset className="ocr-review-fields" disabled={busy} aria-label="품목란 입력">
+            {fieldGroups.map(group=><section className="ocr-field-group" key={group.title} aria-label={group.title}>
+              <h3>{group.title}</h3>
+              {group.keys?.filter(key=>key!=='version' || showVersion).map(fieldRow)}
+              {group.roles?.map(role=><section className="ocr-role" key={role.title} aria-label={role.title}>
+                <h4>{role.title}</h4>
+                {role.keys.map(fieldRow)}
+              </section>)}
+            </section>)}
+            <details className="ocr-review-extra">
+              <summary>기타 정보</summary>
+              <p>일련번호 {row.values.serial || '없음'}</p>
+              {!showVersion && <button type="button" onClick={()=>openField('version',true)}>정정 버전 {row.values.version} 수정</button>}
+            </details>
           </fieldset>}
           <footer className="toolbar">
             <span>{rows.filter(item=>item.verified_usd && item.verified_kg).length} / {rows.length}개 품목란 수치 확인</span>
-            <button type="button" disabled={busy || !rows.length} onClick={()=>void approve(true)}>검증 실행</button>
-            {!!issues.length && <button type="button" disabled={busy} onClick={()=>{
-              const issue = issues.find(item=>item.position>active+1) ?? issues[0]
-              selectRow(issue.position-1)
+            {hasOtherIssueRows && <button type="button" disabled={busy} onClick={()=>{
+              const issue = issues.find(item=>item.position>active+1) ?? issues.find(item=>item.position!==active+1)
+              if (issue) goToIssue(issue)
             }}>다음 오류 품목란</button>}
-            <button className="primary" disabled={busy || !verified} onClick={()=>void approve()}>승인하고 원장에 등록</button>
+            <button className="primary" disabled={busy || !rows.length} onClick={()=>void approve()}>승인하고 원장에 등록</button>
           </footer>
         </section>}
         </div>
-        <OcrProfilePanel key={doc.id} prefix={prefix} file={doc.id} page={pageNumber} reviewBusy={busy}
-          variant={page?.template?.variant} scan={page?.method==='Windows OCR'} selection={selection}
-          candidates={selectedRecognition?.box===selection ? selectedRecognition?.candidates : undefined}
-          values={row?.page===pageNumber ? row.values : undefined}
-          onApply={(field,value)=>updateField(field,value,true)}
-          onPreview={fields=>setProfilePreview({file:doc.id,page:pageNumber,fields})}/>
       </>}
     </dialog>
   </>

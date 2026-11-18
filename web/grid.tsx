@@ -58,6 +58,7 @@ const hasInvalidIdentity = (row:Row) => [...internalLineFields].some(key=>{
   return !/^\d{1,8}$/.test(value) || Number(value) === 0
 })
 const extraLineFields = new Set(['accepted','country','product','fob','kg','quantity','unit'])
+const lineDecisionFields = ['scope','status']
 const emptyChecks: Record<string,Problem[]> = {}
 const emptyRows: Row[] = []
 const numeric = new Set(['usd','fob','kg','quantity'])
@@ -388,7 +389,8 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
               }}>비어 있는 항목에 1 넣기</button>}
               {[...internalLineFields].map(key=>renderField([key,fields[key]]))}
             </fieldset>}
-            {entries.filter(([key])=>!internalLineFields.has(key)&&!roleKeys.has(key.split('_')[0])&&!extraLineFields.has(key)).map(renderField)}
+            {entries.filter(([key])=>!internalLineFields.has(key)&&!roleKeys.has(key.split('_')[0])&&
+              !extraLineFields.has(key)&&!lineDecisionFields.includes(key)).map(renderField)}
             {[...roleKeys].map(role=><fieldset className="party-fields" key={role}>
               <legend>{fields[role+'_name']}</legend>
               {role==='maker' && <ProducerSelect members={members.data} onSelect={member=>{
@@ -398,13 +400,17 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
               }}/>}
               {entries.filter(([key])=>key.split('_')[0]===role).map(renderField)}
             </fieldset>)}
+            <button className="extra-toggle" type="button" aria-expanded={showExtras} onClick={()=>setShowExtras(!showExtras)}>
+              {showExtras?'참고 항목 접기':'선택 참고 항목 펼치기'}
+            </button>
             {showExtras&&entries.filter(([key])=>extraLineFields.has(key)).map(renderField)}
+            <fieldset className="party-fields">
+              <legend>등록 판단</legend>
+              {lineDecisionFields.map(key=>renderField([key,fields[key]]))}
+            </fieldset>
           </>
         })()}
       </fieldset>
-      {kind==='lines' && <button className="extra-toggle" type="button" aria-expanded={showExtras} onClick={()=>setShowExtras(!showExtras)}>
-        {showExtras?'참고 항목 접기':'선택 참고 항목 펼치기'}
-      </button>}
       </div><div className="toolbar editor-actions">
         <button type="submit" className="primary" disabled={busy}>저장</button>
         {kind==='members' && selected.id && <button type="button" className="danger" disabled={busy} onClick={() => {

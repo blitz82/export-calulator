@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { get, request } from './api'
 
 export type Box = [number, number, number, number]
@@ -6,7 +6,7 @@ type Region = {field:string; box:Box; anchor?:string; format?:string}
 type Profile = {name:string; variant:string; source?:'text'|'scan'; regions:Region[]}
 type Version = {id:number; data:Profile; active:number; validated:number}
 export type Preview = Record<string,{normalized:string;box:Box}>
-const options:Record<string,string> = {
+export const ocrFields:Record<string,string> = {
   number:'신고번호',line:'실제 품목란번호',version:'정정 버전',declared:'신고일자',accepted:'수리일자',shipped:'선적일자',
   hs:'HS코드',country:'수출국',product:'품명',usd:'품목란 FOB(USD)',kg:'순중량(kg)',quantity:'수량',unit:'수량단위',
   agent_name:'수출대행자',agent:'수출대행자 사업자번호',owner_name:'수출화주',owner:'수출화주 사업자번호',
@@ -15,10 +15,11 @@ const options:Record<string,string> = {
 export const variants:Record<string,string> = {'preloading-cover':'적재 전 갑지','preloading-continuation':'적재 전 을지',
   'completed-cover':'수출이행 갑지','completed-continuation':'수출이행 을지'}
 
-export function OcrProfilePanel({prefix,file,page,variant,scan,selection,candidates,values,reviewBusy,onApply,onPreview}: {
+export function OcrProfilePanel({prefix,file,page,variant,scan,selection,reviewBusy,onBusyChange,onPreview}: {
   prefix:string; file:number; page:number; variant?:string; scan:boolean; selection?:Box
-  candidates?:Record<string,string>; values?:Record<string,string>; reviewBusy:boolean
-  onApply:(field:string,value:string)=>void; onPreview:(preview:Preview)=>void
+  reviewBusy:boolean
+  onBusyChange:(busy:boolean)=>void
+  onPreview:(preview:Preview)=>void
 }) {
   const blank = JSON.stringify({name:'',variant:variant && variants[variant] ? variant : 'preloading-cover',
     source:scan ? 'scan' : 'text',regions:[]},null,2)
@@ -31,18 +32,30 @@ export function OcrProfilePanel({prefix,file,page,variant,scan,selection,candida
   const [busy,setBusy] = useState(false)
   const path = prefix + '/profiles'
   const saved = versions.find(item=>item.id===selected)
-  const candidate = candidates?.[field]
   let config:Profile | undefined
   try {
     const parsed = JSON.parse(draft)
     if (parsed && typeof parsed==='object' && Array.isArray(parsed.regions)) config = parsed
   } catch { /* The JSON editor can hold an incomplete draft. */ }
 
-  async function run(action:()=>Promise<void>) {
+  useEffect(()=>{
+    const controller = new AbortController()
     setBusy(true)
+    void request(path,{signal:controller.signal}).then(response=>response.json()).then(data=>{
+      if (!controller.signal.aborted) setVersions(data)
+    }).catch(error=>{
+      if (!controller.signal.aborted) setStatus((error as Error).message)
+    }).finally(()=>{
+      if (!controller.signal.aborted) setBusy(false)
+    })
+    return ()=>controller.abort()
+  }, [path])
+
+  async function run(action:()=>Promise<void>) {
+    onBusyChange(true)
     setStatus('')
     try { await action() } catch (error) { setStatus((error as Error).message) }
-    finally { setBusy(false) }
+    finally { onBusyChange(false) }
   }
 
   function edit(value:string) {
@@ -58,8 +71,8 @@ export function OcrProfilePanel({prefix,file,page,variant,scan,selection,candida
     if (config) edit(JSON.stringify({...config,...changes},null,2))
   }
 
-  return <details onToggle={event=>{if(event.currentTarget.open) void run(refresh)}}>
-    <summary>고급 OCR 템플릿 설정</summary>
+  return <section className="ocr-profile" aria-label="OCR 서식 설정">
+    <p>서식 변경은 이후 PDF를 가져올 때 적용됩니다.</p>
     <fieldset disabled={busy || reviewBusy}>
       <legend>서식별 추출 영역과 버전</legend>
       <label>저장된 버전 <select value={selected} onChange={event=>{
@@ -73,20 +86,15 @@ export function OcrProfilePanel({prefix,file,page,variant,scan,selection,candida
         </option>)}
       </select></label>
       <button type="button" onClick={()=>void run(async()=>{
+        if (!window.confirm('기본 서식으로 복원할까요? 이후 PDF를 가져올 때 적용됩니다.')) return
         await request(`${path}/0/activate`,{method:'POST'})
         await refresh()
         setStatus('기본 템플릿을 복원했습니다.')
       })}>기본 템플릿 복원</button>
-      <p>왼쪽 원본에서 영역을 지정하고 재인식하세요. 후보를 현재 품목란에 적용하거나 좌표를 템플릿에 추가할 수 있습니다.</p>
+      <p>왼쪽 PDF에서 영역을 지정하고, 아래에서 입력 항목을 선택해 서식에 추가하세요.</p>
       <label>영역 필드 <select value={field} onChange={event=>setField(event.target.value)}>
-        {Object.entries(options).map(([key,label])=><option key={key} value={key}>{label}</option>)}
+        {Object.entries(ocrFields).map(([key,label])=><option key={key} value={key}>{label}</option>)}
       </select></label>
-      {candidates && <p role="status">{candidate ? `${options[field]} 후보 · ${candidate}` :
-        '선택한 필드 형식에 맞는 후보가 없습니다.'}{candidate && values?.[field] ? ` · 현재 값 ${values[field]}` : ''}</p>}
-      {candidate && !values && <p>현재 쪽의 검토 품목란을 선택하거나 추가하세요.</p>}
-      <button type="button" disabled={!candidate || !values} onClick={()=>{
-        if (candidate && values) onApply(field,candidate)
-      }}>후보를 현재 필드에 적용</button>
       <button type="button" disabled={!selection || !config} onClick={()=>{
         if (selection && config) changeConfig({regions:[...config.regions.filter(region=>region.field!==field), {field,box:selection}]})
       }}>선택 영역 추가</button>
@@ -101,25 +109,30 @@ export function OcrProfilePanel({prefix,file,page,variant,scan,selection,candida
         <option value="text">전자 PDF 텍스트</option>
         <option value="scan">스캔 PDF · Windows OCR</option>
       </select></label>
-      <label>템플릿 JSON<textarea rows={11} value={draft} maxLength={8192} onChange={event=>edit(event.target.value)}/></label>
-      <label>JSON 가져오기 <input type="file" accept=".json,application/json" onChange={event=>{
-        const imported = event.target.files?.[0]
-        event.target.value = ''
-        if (imported) void run(async()=>{
-          if (imported.size>8192) throw new Error('템플릿 JSON은 8KB 이하로 선택하세요.')
-          edit(JSON.stringify(JSON.parse(await imported.text()),null,2))
-        })
-      }}/></label>
+      <details>
+        <summary>서식 백업 및 이전</summary>
+        <label>템플릿 JSON<textarea rows={11} value={draft} maxLength={8192} onChange={event=>edit(event.target.value)}/></label>
+        <label>JSON 가져오기 <input type="file" accept=".json,application/json" onChange={event=>{
+          const imported = event.target.files?.[0]
+          event.target.value = ''
+          if (imported) void run(async()=>{
+            if (imported.size>8192) throw new Error('템플릿 JSON은 8KB 이하로 선택하세요.')
+            edit(JSON.stringify(JSON.parse(await imported.text()),null,2))
+          })
+        }}/></label>
+        <div className="toolbar">
+          <button type="button" onClick={()=>void run(async()=>{
+            const value = JSON.stringify(JSON.parse(draft),null,2)
+            const url = URL.createObjectURL(new Blob([value],{type:'application/json'}))
+            const link = document.createElement('a')
+            link.href = url
+            link.download = 'epms-ocr-template.json'
+            link.click()
+            setTimeout(()=>URL.revokeObjectURL(url),1000)
+          })}>JSON 내보내기</button>
+        </div>
+      </details>
       <div className="toolbar">
-        <button type="button" onClick={()=>void run(async()=>{
-          const value = JSON.stringify(JSON.parse(draft),null,2)
-          const url = URL.createObjectURL(new Blob([value],{type:'application/json'}))
-          const link = document.createElement('a')
-          link.href = url
-          link.download = 'epms-ocr-template.json'
-          link.click()
-          setTimeout(()=>URL.revokeObjectURL(url),1000)
-        })}>JSON 내보내기</button>
         <button type="button" disabled={!!saved} onClick={()=>void run(async()=>{
           const response = await request(path,{method:'POST',headers:{'Content-Type':'application/json'},body:draft})
           const result:{id:number} = await response.json()
@@ -136,14 +149,15 @@ export function OcrProfilePanel({prefix,file,page,variant,scan,selection,candida
           setStatus(result.passed ? '추출 미리보기를 통과했습니다. 원본과 대조하세요.' : '모든 영역의 값을 확인할 수 없습니다.')
         })}>현재 쪽 미리보기</button>
         <button type="button" disabled={!saved?.validated || !!saved.active} onClick={()=>void run(async()=>{
+          if (!window.confirm('이 서식을 활성화할까요? 이후 PDF를 가져올 때 적용됩니다.')) return
           await request(`${path}/${selected}/activate`,{method:'POST'})
           await refresh()
           setStatus('활성화했습니다. 미승인 PDF를 다시 업로드하면 적용됩니다.')
         })}>이 버전 활성화</button>
       </div>
       {preview?.page===page && !!Object.keys(preview.fields).length && <ul>{Object.entries(preview.fields).map(([key,candidate])=>
-        <li key={key}>{options[key]} {candidate.normalized}</li>)}</ul>}
+        <li key={key}>{ocrFields[key]} {candidate.normalized}</li>)}</ul>}
       {status && <p role="status">{status}</p>}
     </fieldset>
-  </details>
+  </section>
 }

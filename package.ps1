@@ -38,7 +38,12 @@ if (!$Lite) {
 }
 Copy-Item -LiteralPath $guide -Destination "$distPath/$appName/실행 안내.txt"
 $packageDir = Join-Path $distPath $appName
-Copy-Item -LiteralPath "Start-EPMS-OCR.cmd" -Destination $packageDir
+if ($Lite) {
+    Copy-Item -LiteralPath "Start-EPMS-OCR.cmd" -Destination $packageDir
+} else {
+    Rename-Item -LiteralPath (Join-Path $packageDir "$appName.exe") -NewName "EPMS.exe"
+    Copy-Item -LiteralPath "Start-EPMS-Portable.cmd" -Destination (Join-Path $packageDir "공동정산 수출실적 관리 시작.cmd")
+}
 Copy-Item -LiteralPath "docs/OCR_REVIEW_WORKFLOW.md" -Destination "$packageDir/OCR 안내.md"
 Copy-Item -LiteralPath "docs/OCR_TEMPLATE_GUIDE.md" -Destination $packageDir
 Copy-Item -LiteralPath "docs/OPEN_SOURCE_COMPLIANCE.md" -Destination "$distPath/$appName/오픈소스 검토 안내.md"
