@@ -3,7 +3,7 @@ import type { PointerEvent } from 'react'
 import { request } from './api'
 import type { Fields, Problem, Row } from './grid'
 import { ProducerSelect } from './producer-select'
-import { OcrProfilePanel } from './ocr-profile'
+import { OcrProfilePanel, variants } from './ocr-profile'
 import type { Box, Preview } from './ocr-profile'
 
 type Source = {box?:[number,number,number,number]; method?:string; alternate?:string; page?:number}
@@ -21,9 +21,6 @@ const choices:Record<string, string[]> = {
 }
 const numericFields = ['usd','kg'] as const
 const coreFields = ['number','line','declared','hs','usd','kg']
-const variants:Record<string,string> = {'preloading-cover':'적재 전 갑지','preloading-continuation':'적재 전 을지',
-  'completed-cover':'수출이행 갑지','completed-continuation':'수출이행 을지'}
-
 const rotated = ([x,y,r,b]:Box, angle:number):Box => {
   if (angle===90) return [1-b,x,1-y,r]
   if (angle===180) return [1-r,1-b,1-x,1-y]
@@ -55,7 +52,8 @@ export function OcrInput({org, fields, members, disabled, onSaved}: {
   const [rotation,setRotation] = useState(0)
   const [selecting,setSelecting] = useState(false)
   const [selection,setSelection] = useState<Box>()
-  const [profilePreview,setProfilePreview] = useState<Preview>({})
+  const [selectedRecognition,setSelectedRecognition] = useState<{box:Box; candidates:Fields}>()
+  const [profilePreview,setProfilePreview] = useState<{file:number; page:number; fields:Preview}>()
   const start = useRef<[number,number] | null>(null)
   const highlight = useRef<HTMLButtonElement>(null)
   const prefix = `org/${org}/ocr`
@@ -70,7 +68,8 @@ export function OcrInput({org, fields, members, disabled, onSaved}: {
     setImage('')
     setImageError('')
     setSelection(undefined)
-    setProfilePreview({})
+    setSelectedRecognition(undefined)
+    setProfilePreview(undefined)
     if (docId === undefined) return
     const controller = new AbortController()
     let url = ''
@@ -149,6 +148,16 @@ export function OcrInput({org, fields, members, disabled, onSaved}: {
     setIssues([])
   }
 
+  function updateField(field:string, value:string, fromOcr=false) {
+    if (field==='usd') {
+      update({usd:value,fob:value})
+      return
+    }
+    const roles = fromOcr ? ['agent','owner','maker'] : ['maker']
+    const role = roles.find(key=>field===key || field===key+'_name')
+    update(role ? {[field]:value,[role+'_state']:''} : {[field]:value})
+  }
+
   async function recheck(field:string) {
     if (!row || row.sourceIndex === undefined) return
     setBusy(true)
@@ -173,12 +182,14 @@ export function OcrInput({org, fields, members, disabled, onSaved}: {
     if (!selection) return
     setBusy(true)
     setRegion('')
+    setSelectedRecognition(undefined)
     try {
       const response = await request(`${prefix}/${docId}/page/${pageNumber}/selection`,{
         method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({box:selection}),
       })
-      const result:{text:string;warning:string} = await response.json()
+      const result:{text:string;warning:string;candidates?:Fields} = await response.json()
       setRegion(result.warning || (result.text ? `재인식 후보 · ${result.text}` : '선택 영역에서 문자를 읽지 못했습니다.'))
+      if (!result.warning && result.text) setSelectedRecognition({box:selection,candidates:result.candidates ?? {}})
     } catch (error) { setRegion((error as Error).message) }
     finally { setBusy(false) }
   }
@@ -309,8 +320,9 @@ export function OcrInput({org, fields, members, disabled, onSaved}: {
               onPointerCancel={()=>{start.current=null}}>
               <img alt={`수출신고필증 원본 ${pageNumber}쪽`} src={image} draggable={false}/>
               {selection && <span className="ocr-selected-box" style={boxStyle(rotated(selection,rotation))}/>}
-              {Object.entries(profilePreview).map(([key,item])=><span className="ocr-selected-box" key={key}
-                title={fields[key] ?? key} style={boxStyle(rotated(item.box,rotation))}/>)}
+              {profilePreview?.file===doc.id && profilePreview.page===pageNumber &&
+                Object.entries(profilePreview.fields).map(([key,item])=><span className="ocr-selected-box" key={key}
+                  title={fields[key] ?? key} style={boxStyle(rotated(item.box,rotation))}/>)}
               {Object.entries(source ?? {}).map(([key,item])=>{
                 if (selecting || !item.box || pageNumber !== (item.page ?? row?.page)) return null
                 return <button type="button" key={key} ref={focused===key ? highlight : null}
@@ -378,8 +390,7 @@ export function OcrInput({org, fields, members, disabled, onSaved}: {
                       setRegion('')
                       if (picked?.box) setPageNumber(picked.page ?? row.page)
                     }}
-                    onChange={e=>update(key==='usd'?{usd:e.target.value,fob:e.target.value}:
-                      key==='maker'||key==='maker_name'?{[key]:e.target.value,maker_state:''}:{[key]:e.target.value})}/>}
+                    onChange={e=>updateField(key,e.target.value)}/>}
                   {(original!==undefined || [...coreFields,'serial'].includes(key)) &&
                     <small>{(key==='usd' && row.verified_usd) || (key==='kg' && row.verified_kg) ? '확인완료' :
                       problems.length ? '확인필요' : original!==undefined && value!==original ? '수동 수정' :
@@ -413,7 +424,12 @@ export function OcrInput({org, fields, members, disabled, onSaved}: {
           </footer>
         </section>}
         </div>
-        <OcrProfilePanel key={doc.id} prefix={prefix} file={doc.id} page={pageNumber} selection={selection} onPreview={setProfilePreview}/>
+        <OcrProfilePanel key={doc.id} prefix={prefix} file={doc.id} page={pageNumber} reviewBusy={busy}
+          variant={page?.template?.variant} scan={page?.method==='Windows OCR'} selection={selection}
+          candidates={selectedRecognition?.box===selection ? selectedRecognition?.candidates : undefined}
+          values={row?.page===pageNumber ? row.values : undefined}
+          onApply={(field,value)=>updateField(field,value,true)}
+          onPreview={fields=>setProfilePreview({file:doc.id,page:pageNumber,fields})}/>
       </>}
     </dialog>
   </>

@@ -581,7 +581,8 @@ def create_app(path=None):
         with db.connect() as conn:
             data = ocr_file(conn, org, file_id)["data"]
         try:
-            return ocr.recognize_region(data, page, selection.box)
+            result = ocr.recognize_region(data, page, selection.box)
+            return dict(result, candidates=ocr_profiles.selection_values(result["text"]) if not result["warning"] else {})
         except ValueError as error:
             fail(str(error))
 
@@ -625,13 +626,16 @@ def create_app(path=None):
         with db.connect() as conn:
             data = ocr_file(conn, org, file_id)["data"]
             config = conn.execute(select(profile_table.c.data).where(key)).scalar()
+            stored = next((row["original"] for row in ocr_pages(conn, file_id) if row["row"] == page), None)
         if config is None:
             fail("템플릿 버전을 찾을 수 없습니다.", 404)
+        if stored is None:
+            fail("원본 쪽 번호를 확인하세요.")
         profile = ocr_profiles.Profile.model_validate(config)
-        with ocr.PDF_LOCK, ocr.open_pdf(data) as document:
-            if not 1 <= page <= len(document):
-                fail("원본 쪽 번호를 확인하세요.")
-            with closing(document[page - 1]) as pdf_page:
+        if profile.source == "scan":
+            candidates = ocr_profiles.preview_scan(data, stored, profile)
+        else:
+            with ocr.PDF_LOCK, ocr.open_pdf(data) as document, closing(document[page - 1]) as pdf_page:
                 _, rows = ocr.read_pdf_page(pdf_page)
                 candidates = ocr_profiles.preview(pdf_page, profile) if len(rows) == 1 else {}
         passed = len(candidates) == len(profile.regions)

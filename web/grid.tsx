@@ -123,7 +123,12 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
         const problems = rowChecks[String(p.data?.id)] ?? []
         return problems.some(item=>item.severity==='ERROR')?'확정 차단':problems.some(item=>item.severity==='WARNING')?'확인 필요':'통과'
       },
-      cellClassRules:{'cell-error':(p: {value:unknown})=>p.value==='확정 차단','cell-warning':(p: {value:unknown})=>p.value==='확인 필요'},
+      cellClassRules:{
+        'cell-error':(p: {value:unknown})=>p.value==='확정 차단',
+        'cell-warning':(p: {value:unknown})=>p.value==='확인 필요',
+        'validation-pass':(p: {value:unknown})=>p.value==='통과',
+        'validation-excluded':(p: {value:unknown})=>p.value==='제외',
+      },
     }] : []),
   ], [displayFields, hidden, kind, rowChecks, checks.isPending, checks.isError])
   useEffect(() => {

@@ -169,6 +169,8 @@ input[aria-invalid=true],select[aria-invalid=true],.ag-cell.cell-error,.ag-cell.
 .ledger-grid .ag-cell.validation-cell, .ledger-grid .ag-header-cell.validation-header { background:#292929; color:#fff; }
 .ledger-grid .ag-cell.validation-cell.cell-error { background:#8f1725; color:#fff; box-shadow:none; }
 .ledger-grid .ag-cell.validation-cell.cell-warning { background:#644721; color:#fff; box-shadow:none; }
+.ledger-grid .ag-cell.validation-cell.validation-pass { background:#21643c; }
+.ledger-grid .ag-cell.validation-cell.validation-excluded { background:#a84a12; }
 .section-top .recognition-heading { font-size:12px; }
 
 .layout > main { min-width:0; }

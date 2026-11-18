@@ -332,6 +332,63 @@ def test_ocr_profile_drafts_are_scoped_and_require_preview(tmp_path):
         app.state.db.dispose()
 
 
+def test_scan_profile_fills_missing_numeric_fields_on_matching_single_item_pdf(tmp_path, monkeypatch):
+    client, app = client_for(tmp_path / "scan-profile.db")
+    scan_box = [.5, .6, .7, .65]
+    amount_box = [.7, .6, .9, .65]
+    quantity_box = [.3, .6, .45, .65]
+    owner_box = [.15, .31, .32, .35]
+    extracted = {"number": "12345-26-012345X", "line": "001"}
+    crops = {tuple(amount_box): "$ 1,234.50", tuple(scan_box): "18.25 kg",
+             tuple(quantity_box): "2,500", tuple(owner_box): "123-45-67834"}
+
+    def extract(data):
+        title = "수출신고필증(수출이행, 갑지)" if data == b"other" else "수출신고필증(적재전, 갑지)"
+        rows = [(extracted.copy(), {})]
+        if data == b"existing":
+            rows[0][0]["usd"] = "900"
+        if data == b"multi":
+            rows.append(({"line": "002"}, {}))
+        return [ocr.extracted_page(1, title, "Windows OCR", "", rows)]
+
+    def recognize(_image, box):
+        return {"text": crops[tuple(box)], "warning": ""}
+
+    monkeypatch.setattr(ocr, "extract", extract)
+    monkeypatch.setattr(ocr, "page_image", lambda *_: b"page")
+    monkeypatch.setattr(ocr, "recognize_crop", recognize)
+    try:
+        client.post("/api/organizations", params={"name": "스캔 좌표"}).raise_for_status()
+        route = "/api/org/1/ocr"
+
+        def upload(data):
+            return client.post(route, params={"name": "synthetic.pdf"}, content=data).raise_for_status().json()
+
+        source = upload(b"source")
+        selection = client.post(f"{route}/{source['id']}/page/1/selection", json={"box": amount_box})
+        assert selection.raise_for_status().json()["candidates"]["usd"] == "1234.50"
+        config = {"name": "스캔 품목란", "variant": "preloading-cover", "source": "scan",
+                  "regions": [{"field": field, "box": box} for field, box in
+                              [("usd", amount_box), ("kg", scan_box), ("quantity", quantity_box), ("owner", owner_box)]]}
+        version = client.post(f"{route}/profiles", json=config).raise_for_status().json()["id"]
+        profile = f"{route}/profiles/{version}"
+        preview = client.post(f"{profile}/preview", params={"file_id": source["id"], "page": 1})
+        assert preview.raise_for_status().json()["passed"] is True
+        client.post(f"{profile}/activate").raise_for_status()
+
+        for uploaded in (upload(b"source"), upload(b"new")):
+            page = uploaded["pages"][0]
+            assert page["rows"] == [extracted | {"usd": "1234.50", "fob": "1234.50", "kg": "18.25",
+                                                "quantity": "2500", "owner": "1234567834"}]
+            assert page["evidence"][0]["kg"]["box"] == scan_box
+        assert upload(b"existing")["pages"][0]["rows"][0]["usd"] == "900"
+        for data in (b"multi", b"other"):
+            assert "usd" not in upload(data)["pages"][0]["rows"][0]
+    finally:
+        client.close()
+        app.state.db.dispose()
+
+
 def test_ocr_approval_checks_active_declaration_lines(tmp_path):
     client, app = client_for(tmp_path / "ocr-registration.db")
     base = "/api/org/1"

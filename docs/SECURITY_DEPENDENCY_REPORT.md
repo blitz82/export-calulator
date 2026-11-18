@@ -22,3 +22,5 @@ Python의 기존 설치값과 일치하도록 `tzdata` 2026.6 및 개발용 `htt
 | WebView2 고정 런타임 | Portable의 기록 버전을 확인했다. Microsoft Edge 및 WebView2 공개 업데이트 정보를 검토했으며, 오프라인 고정 패키지의 최신 보안 상태와 재배포 약관 검토는 남아 있다. [Microsoft Edge 릴리스 정보](https://learn.microsoft.com/en-us/deployedge/microsoft-edge-relnote-stable-channel) |
 
 2026-11-18 v1.3.0 준비 중 개발 SBOM의 PyPI·npm 57개와 새 Lite·Portable SBOM 각각의 67개를 OSV로 일괄 조회했다. 세 응답에 취약점 ID가 없었다. OSV 결과는 PDFium DLL과 WebView2의 보안 조사 범위를 포함하지 않는다. 재현 명령은 [SBOM 가이드](SBOM_GUIDE.md)에 있다.
+
+2026-11-18 v1.3.1에서도 개발 SBOM 57개, Lite와 Portable SBOM 각 67개를 OSV로 조회했다. PyPI·npm 세 범위 모두 조회를 완료했고 응답에 취약점 ID가 없었다. PDFium DLL과 WebView2는 이 조회에 포함되지 않는다.

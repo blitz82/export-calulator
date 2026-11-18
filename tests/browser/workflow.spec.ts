@@ -355,11 +355,31 @@ test('PDF 검토에서 원본 위치와 재인식 후보를 확인하고 값을 
   await dialog.getByRole('button',{name:'지정 영역 재인식'}).click()
   await expect(dialog.getByText('재인식 후보 · 321')).toBeVisible()
   await expect(amount).toHaveValue('120')
+  await dialog.getByRole('button',{name:'이전 쪽'}).click()
+  const firstPage=dialog.getByRole('img',{name:'수출신고필증 원본 1쪽'})
+  await expect(firstPage).toBeVisible()
+  await page.route('**/ocr/99/page/1/selection',route=>route.fulfill({json:{
+    text:'USD 1,234.50',warning:'',candidates:{usd:'1234.50'},
+  }}))
+  await dialog.getByRole('button',{name:'원본 영역 지정'}).click()
+  const firstBounds=await firstPage.boundingBox()
+  if (!firstBounds) throw new Error('첫 쪽 미리보기 위치가 없습니다.')
+  await page.mouse.move(firstBounds.x+30,firstBounds.y+30)
+  await page.mouse.down()
+  await page.mouse.move(firstBounds.x+80,firstBounds.y+70)
+  await page.mouse.up()
+  await dialog.getByRole('button',{name:'지정 영역 재인식'}).click()
+  await expect(dialog.getByText('재인식 후보 · USD 1,234.50')).toBeVisible()
+  const confirmed=dialog.getByRole('checkbox',{name:'품목란 FOB(USD) 원본 확인'})
+  await confirmed.check()
   let version:{id:number;data:unknown;active:number;validated:number} | undefined
   await page.route('**/ocr/profiles',route=>{
     if (route.request().method()==='POST') {
       const data = route.request().postDataJSON()
+      expect(data.source).toBe('scan')
+      expect(data.regions[0]).toMatchObject({field:'usd'})
       expect(data.regions[0].box).toHaveLength(4)
+      expect(data.regions[1]).toMatchObject({field:'owner'})
       version = {id:1,data,active:0,validated:0}
       return route.fulfill({json:{id:1}})
     }
@@ -367,14 +387,33 @@ test('PDF 검토에서 원본 위치와 재인식 후보를 확인하고 값을 
   })
   await page.route('**/ocr/profiles/1/preview?*',route=>{
     if (version) version.validated=1
-    return route.fulfill({json:{passed:true,candidates:{number:{normalized:'12345-26-012345X',box:[.3,.4,.5,.46]}}}})
+    return route.fulfill({json:{passed:true,candidates:{
+      usd:{normalized:'1234.50',box:[.3,.4,.5,.46]},
+      owner:{normalized:'1234567834',box:[.2,.25,.33,.29]},
+    }}})
   })
   await page.route('**/ocr/profiles/1/activate',route=>{
     if (version) version.active=1
     return route.fulfill({json:{active:1}})
   })
   await dialog.getByText('고급 OCR 템플릿 설정',{exact:true}).click()
-  await dialog.getByRole('textbox',{name:'템플릿 JSON'}).fill('{"name":"시험","variant":"preloading-cover","regions":[]}')
+  await dialog.getByLabel('영역 필드').selectOption('usd')
+  await dialog.getByRole('button',{name:'후보를 현재 필드에 적용'}).click()
+  await expect(amount).toHaveValue('1234.50')
+  await expect(confirmed).not.toBeChecked()
+  await dialog.getByLabel('템플릿 이름').fill('시험')
+  await dialog.getByLabel('인식 방식').selectOption('scan')
+  await dialog.getByRole('button',{name:'선택 영역 추가'}).click()
+  const ownerStatus = dialog.getByRole('combobox',{name:'수출화주 확인',exact:true})
+  await ownerStatus.selectOption('회원사 아님')
+  await page.route('**/ocr/99/page/1/selection',route=>route.fulfill({json:{
+    text:'123-45-67834',warning:'',candidates:{owner:'1234567834'},
+  }}))
+  await dialog.getByRole('button',{name:'지정 영역 재인식'}).click()
+  await dialog.getByLabel('영역 필드').selectOption('owner')
+  await dialog.getByRole('button',{name:'후보를 현재 필드에 적용'}).click()
+  await expect(dialog.getByRole('textbox',{name:'수출화주 사업자번호',exact:true})).toHaveValue('1234567834')
+  await expect(ownerStatus).toHaveValue('')
   await dialog.getByRole('button',{name:'선택 영역 추가'}).click()
   await dialog.getByRole('button',{name:'새 버전 저장'}).click()
   await expect(dialog.getByText('초안 버전을 저장했습니다.')).toBeVisible()

@@ -15,7 +15,7 @@ from epms import rules
 
 MAX_BYTES = 20_000_000
 MAX_PAGES = 30
-EXTRACTION_VERSION = 6
+EXTRACTION_VERSION = 7
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png"}
 CORE_FIELDS = {"number", "declared", "line", "hs", "kg", "usd"}
 PDF_LOCK = RLock()  # PDFium calls must be serialized within this process.
@@ -594,9 +594,13 @@ def enlarged_region(data, box, *, contrast=False):
 
 
 def recognize_region(data, page, box):
+    return recognize_crop(page_image(data, page), box)
+
+
+def recognize_crop(image, box):
     x0, y0, x1, y1 = box
-    cropped, _ = enlarged_region(page_image(data, page), (max(0, x0 - .004), max(0, y0 - .004),
-                                                        min(1, x1 + .004), min(1, y1 + .004)))
+    cropped, _ = enlarged_region(image, (max(0, x0 - .004), max(0, y0 - .004),
+                                          min(1, x1 + .004), min(1, y1 + .004)))
     payload, warning = recognize(cropped)
     return {"text": "\n".join(line["text"] for line in payload.get("lines", [])), "warning": warning}
 
@@ -686,7 +690,7 @@ def extracted_page(page, text, method, warning, matches):
                 totals[key] = found.pop()
     return dict(page=page, text=text, method=method, warning=warning, extractor_version=EXTRACTION_VERSION,
                 template={"id": template["id"], "version": template["version"], "variant": variant} if variant else None,
-                document_totals=totals,
+                document_totals=totals, detected_items=len(matches),
                 rows=[values for values, _ in matches], evidence=[source for _, source in matches])
 
 

@@ -38,7 +38,9 @@ if (!$Lite) {
 }
 Copy-Item -LiteralPath $guide -Destination "$distPath/$appName/실행 안내.txt"
 $packageDir = Join-Path $distPath $appName
+Copy-Item -LiteralPath "Start-EPMS-OCR.cmd" -Destination $packageDir
 Copy-Item -LiteralPath "docs/OCR_REVIEW_WORKFLOW.md" -Destination "$packageDir/OCR 안내.md"
+Copy-Item -LiteralPath "docs/OCR_TEMPLATE_GUIDE.md" -Destination $packageDir
 Copy-Item -LiteralPath "docs/OPEN_SOURCE_COMPLIANCE.md" -Destination "$distPath/$appName/오픈소스 검토 안내.md"
 Copy-Item -LiteralPath "docs/OCR_RELEASE_NOTES.md" -Destination "$packageDir/RELEASE_NOTES.md"
 & $Python -m epms.packaging_checks $variant --webview $WebViewRuntime --output (Join-Path $packageDir "build-info.json")

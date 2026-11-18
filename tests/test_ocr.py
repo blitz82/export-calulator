@@ -4,7 +4,7 @@ from io import BytesIO
 import pytest
 from PIL import Image
 
-from epms import ocr
+from epms import ocr, ocr_profiles
 
 
 def searchable_pdf():
@@ -85,6 +85,24 @@ def test_region_retry_crops_the_rotated_preview(monkeypatch):
 def test_extracted_page_identifies_template_variant(heading, variant):
     info = ocr.extracted_page(1, heading, "PDF", "", [])["template"]
     assert (info["variant"] if info else None) == variant
+
+
+@pytest.mark.parametrize(("field", "source", "expected"), [
+    ("line", "003 / 012", "003"),
+    ("version", "02", "02"),
+    ("country", "대한민국", "대한민국"),
+    ("product", "신선 포도", "신선 포도"),
+    ("quantity", "1,200.50", "1200.50"),
+    ("quantity", "12 34", None),
+    ("unit", "PCS", "PCS"),
+    ("agent", "123-45-67834", "1234567834"),
+    ("owner", "123-45-67835", None),
+    ("maker", "123-45-67834\n123-45-67835", None),
+    ("owner_name", "(주) 수출상사", "(주) 수출상사"),
+    ("maker_name", "제조사\n다른 업체", None),
+])
+def test_ocr_region_accepts_only_the_expected_value_shape(field, source, expected):
+    assert ocr_profiles.selection_values(source).get(field) == expected
 
 
 def test_unipass_repeated_lines_exclude_document_total():
