@@ -15,6 +15,13 @@ def clean(value):
     return unicodedata.normalize("NFKC", str(value if value is not None else "")).strip()
 
 
+def format_line_number(value):
+    text = clean(value)
+    if re.fullmatch(r"[0-9]{1,8}", text) and int(text) > 0:
+        return str(int(text)).zfill(3)
+    return text
+
+
 def company_name(value):
     return re.sub(r"\s+|주식회사|\(주\)", "", clean(value)).casefold()
 

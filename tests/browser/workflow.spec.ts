@@ -60,7 +60,7 @@ test('새 품목에서 회원사와 신고를 입력하고 제출용 Excel 확�
   await expect(page.locator('input[name="maker"]')).toHaveValue('1234567834')
   await page.getByRole('button',{name:'저장',exact:true}).click()
   await expect(page.getByRole('status')).toContainText('저장됨')
-  await expect(page.locator('[role="gridcell"][col-id="line"]')).toHaveText('1')
+  await expect(page.locator('[role="gridcell"][col-id="line"]')).toHaveText('001')
   expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(820)
 
   await nav.getByRole('link',{name:'업무 홈'}).click()
@@ -91,7 +91,12 @@ test('새 품목에서 회원사와 신고를 입력하고 제출용 Excel 확�
   const details=page.getByRole('group',{name:'품목란 번호와 정정 버전'})
   await expect(details).toBeVisible()
   await details.getByRole('button',{name:'비어 있는 항목에 1 넣기'}).click()
-  await expect(details.locator('input[name="line"]')).toHaveValue('1')
+  const itemNumber=details.locator('input[name="line"]')
+  await expect(itemNumber).toHaveValue('001')
+  await itemNumber.fill('2')
+  await itemNumber.press('Tab')
+  await expect(itemNumber).toHaveValue('002')
+  await itemNumber.fill('1')
   await expect(details.locator('input[name="version"]')).toHaveValue('1')
   await page.getByRole('button',{name:'저장',exact:true}).click()
   await expect(page.getByRole('status')).toContainText('저장됨')
@@ -486,4 +491,58 @@ test('원장 PDF를 보면서 같은 행을 편집하고 목록으로 돌아간�
   await expect(search).toHaveValue('12345-26-54321X')
   await expect(amount).toHaveValue('142')
   await expect(page.getByRole('button',{name:'PDF 보기',exact:true})).toBeFocused()
+})
+
+test('PDF 검토에서 수출대행자와 수출화주를 이름과 사업자번호로 찾는다', async ({page,request}) => {
+  const {token}=await (await request.get('/api/session')).json()
+  await office(request,{'x-epms-token':token})
+  await page.route('**/data/members',route=>route.fulfill({json:[
+    {id:701,name:'한빛무역',aliases:'한빛 수출',number:'1234567834',kind:'수출업체'},
+    {id:702,name:'푸른유통',number:'4028173590',kind:'복수'},
+  ]}))
+  await page.route('**/ocr?name=*',route=>route.fulfill({json:{id:99,approved:false,pages:[{
+    page:1,method:'PDF 텍스트',text:'',warning:'',
+    rows:[{line:'1',number:'12345-26-12345X',agent_state:'회원사 아님'}],
+  }]}}))
+  await page.route('**/ocr/99/page/1',route=>route.fulfill({
+    contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="400" height="500"/>',
+  }))
+  await page.goto('/#/lines')
+  await page.getByRole('button',{name:'PDF에서 가져오기'}).click()
+  const dialog=page.getByRole('dialog',{name:'PDF에서 가져오기'})
+  await dialog.locator('input[type=file]').setInputFiles({
+    name:'회원사 후보.pdf',mimeType:'application/pdf',buffer:Buffer.from('%PDF-synthetic'),
+  })
+  await expect(dialog.getByText('품목란 001 · 원본 1쪽')).toBeVisible()
+  await dialog.getByRole('button',{name:/^품목란 번호 001/}).click()
+  const line=dialog.getByRole('textbox',{name:'품목란 번호',exact:true})
+  await line.fill('2')
+  await line.press('Tab')
+  await expect(line).toHaveValue('002')
+  for(const role of ['수출대행자','수출화주']){
+    const group=dialog.getByRole('region',{name:role,exact:true})
+    const nameRow=group.getByRole('button',{name:new RegExp('^'+role+' (?!사업자번호|확인)')})
+    const numberRow=group.getByRole('button',{name:new RegExp('^'+role+' 사업자번호')})
+    await nameRow.click()
+    const name=group.getByRole('textbox',{name:role,exact:true})
+    await name.fill('한빛 수출')
+    const nameCandidates=group.getByRole('list',{name:role+' 회원사 후보'})
+    await expect(nameCandidates.getByRole('button',{name:'한빛무역 · 1234567834'})).toBeVisible()
+    await expect(numberRow).not.toContainText('1234567834')
+    await nameCandidates.getByRole('button',{name:'한빛무역 · 1234567834'}).click()
+    await expect(name).toHaveValue('한빛무역')
+    await expect(numberRow).toContainText('1234567834')
+    await expect(nameCandidates).toHaveCount(0)
+    await numberRow.click()
+    const number=group.getByRole('textbox',{name:role+' 사업자번호',exact:true})
+    await number.fill('402-81')
+    const numberCandidates=group.getByRole('list',{name:role+' 사업자번호 회원사 후보'})
+    await expect(numberCandidates.getByRole('button',{name:'푸른유통 · 4028173590'})).toBeVisible()
+    await expect(nameRow).toContainText('한빛무역')
+    await numberCandidates.getByRole('button',{name:'푸른유통 · 4028173590'}).click()
+    await expect(number).toHaveValue('4028173590')
+    await expect(nameRow).toContainText('푸른유통')
+    await group.getByRole('button',{name:new RegExp('^'+role+' 확인')}).click()
+    await expect(group.getByRole('combobox',{name:role+' 확인',exact:true})).toHaveValue('')
+  }
 })

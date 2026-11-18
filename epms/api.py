@@ -260,6 +260,8 @@ def create_app(path=None):
     def save(conn, org, kind, edit, user, source=None, index=None, declarations=None):
         table = table_for(kind)
         values = {key: rules.clean(value) for key, value in edit.values.items() if key in FIELDS[kind]}
+        if kind == "lines" and "line" in values:
+            values["line"] = rules.format_line_number(values["line"])
         if any(len(v) > 4000 for v in values.values()):
             fail("셀 입력값은 4,000자 이하여야 합니다.")
         old = None

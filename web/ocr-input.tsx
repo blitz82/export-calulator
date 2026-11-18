@@ -3,6 +3,8 @@ import type { PointerEvent } from 'react'
 import { request } from './api'
 import type { Fields, Problem, Row } from './grid'
 import { ProducerSelect } from './producer-select'
+import { formatLineNumber } from './line-number'
+import { findMemberCandidates, MemberCandidates, memberNames, normalizeCompany, normalizeNumber } from './member-candidates'
 import { OcrProfilePanel, variants, ocrFields } from './ocr-profile'
 import type { Box, Preview } from './ocr-profile'
 
@@ -13,12 +15,15 @@ type Document = {id:number; pages:Page[]; approved:boolean}
 type Review = {page:number; values:Fields; verified_usd:string; verified_kg:string; sourceIndex?:number}
 type ReviewIssue = Problem & {position:number}
 const makeRow = (page:number, values:Fields = {}, sourceIndex?:number):Review =>
-  ({page, values:{version:'1', ...values}, verified_usd:'', verified_kg:'', sourceIndex})
+  ({page, values:{version:'1', ...values, ...(values.line===undefined ? {} : {line:formatLineNumber(values.line)})},
+    verified_usd:'', verified_kg:'', sourceIndex})
 const states = ['원본에 없음', '회원사 아님']
 const choices:Record<string, string[]> = {
   scope:['대상','제외','미확정'], status:['유효','취소','미확정'],
   agent_state:states, owner_state:states,
 }
+const exporterRoles = ['agent','owner']
+const exporterRole = (key:string) => exporterRoles.find(role=>key===role || key===role+'_name')
 const numericFields = ['usd','kg'] as const
 const requiredFields = new Set(['number','line','version','shipped','hs','usd','kg','scope','status'])
 const fieldGroups = [
@@ -205,9 +210,19 @@ export function OcrInput({org, fields, members, disabled, onSaved}: {
       update({usd:value,fob:value})
       return
     }
-    const roles = fromOcr ? ['agent','owner','maker'] : ['maker']
-    const role = roles.find(key=>field===key || field===key+'_name')
-    update(role ? {[field]:value,[role+'_state']:''} : {[field]:value})
+    if (field==='maker' || field==='maker_name') {
+      update({[field]:value,maker_state:''})
+      return
+    }
+    const role = exporterRole(field)
+    if (!role || !row) {
+      update({[field]:value})
+      return
+    }
+    const number = normalizeNumber(field===role ? value : row.values[role])
+    const registered = members?.some(member=>normalizeNumber(member.number)===number)
+    const retainNonMember = !fromOcr && !registered && row.values[role+'_state']==='회원사 아님'
+    update({[field]:value,[role+'_state']:retainNonMember ? '회원사 아님' : ''})
   }
 
   function point(event:PointerEvent<HTMLDivElement>):[number,number] {
@@ -314,6 +329,14 @@ export function OcrInput({org, fields, members, disabled, onSaved}: {
     if (next) openField(next,true)
   }
 
+  function exporterCandidates(role:string,key:string,value:string,values:Fields) {
+    const number = normalizeNumber(values[role])
+    const name = normalizeCompany(values[role+'_name'])
+    const registered = number.length===10 && members?.some(member=>
+      normalizeNumber(member.number)===number && memberNames(member).includes(name))
+    return registered ? [] : findMemberCandidates(members,value,key===role ? 'number' : 'name')
+  }
+
   function fieldRow(key:string) {
     if (!row) return null
     const problems = currentIssues.filter(issue=>issueKey(issue)===key)
@@ -331,6 +354,8 @@ export function OcrInput({org, fields, members, disabled, onSaved}: {
       mismatch ? '값 불일치' : numeric ? (verified ? '확인 완료' : '원본 확인 필요') : ''
     const alerted = !!problems.length || undecided || (required && !value) || mismatch || (!!numeric && !verified)
     const expanded = focused===key
+    const role = expanded ? exporterRole(key) : undefined
+    const candidates = role ? exporterCandidates(role,key,value,row.values) : []
     return <div className={'ocr-field-row' + (expanded ? ' ocr-field-open' : '')} key={key}>
       <button type="button" className="ocr-field-summary" aria-expanded={expanded} aria-controls={id + '-editor'}
         onClick={()=>{
@@ -353,7 +378,15 @@ export function OcrInput({org, fields, members, disabled, onSaved}: {
             {choices[key].map(option=><option key={option}>{option}</option>)}
           </select> : <input id={id} aria-label={label} value={value}
             aria-invalid={!!problems.length} aria-describedby={problems.length ? id + '-issues' : undefined}
-            onChange={e=>updateField(key,e.target.value)}/>}
+            onChange={e=>updateField(key,e.target.value)} onBlur={key==='line' ? e=>{
+              const formatted = formatLineNumber(e.currentTarget.value)
+              if (formatted!==e.currentTarget.value) updateField(key,formatted)
+            } : undefined}/>}
+          {role && <MemberCandidates members={candidates} label={label} onSelect={member=>{
+            update({[role+'_name']:String(member.name),[role]:String(member.number),[role+'_state']:''})
+            clearReading()
+            setErrorField(key)
+          }}/>}
           {key==='scope' && <small>이 품목란이 공동정산에 포함되는지 선택하세요.</small>}
           {mismatch && <small>다른 추출 후보 · {picked.alternate}</small>}
           {numeric && <label className="ocr-confirm">

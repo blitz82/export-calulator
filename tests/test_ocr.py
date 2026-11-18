@@ -89,6 +89,7 @@ def test_extracted_page_identifies_template_variant(heading, variant):
 
 @pytest.mark.parametrize(("field", "source", "expected"), [
     ("line", "003 / 012", "003"),
+    ("line", "2 / 12", "002"),
     ("version", "02", "02"),
     ("country", "대한민국", "대한민국"),
     ("product", "신선 포도", "신선 포도"),

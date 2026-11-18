@@ -418,7 +418,7 @@ def test_ocr_approval_checks_active_declaration_lines(tmp_path):
         assert client.post(url, params={"validate_only": True}, json=[reviewed, corrected]).raise_for_status().json() == {"valid": True}
         assert len(client.get(path).raise_for_status().json()) == 2
         assert client.post(url, json=[reviewed, corrected]).raise_for_status().json() == {"imported": 2, "needs_review": 1}
-        assert len(client.get(path).raise_for_status().json()) == 4
+        assert [row["line"] for row in client.get(path).raise_for_status().json()] == ["001", "002", "001", "002"]
         checks = client.get(base + "/line-checks").raise_for_status().json()
         assert sum(any(p["code"] == "D080" for p in issues) for issues in checks.values()) == 2
     finally:
@@ -514,6 +514,33 @@ def test_line_import_saves_incomplete_rows_for_correction(tmp_path):
     }]).json()[0]
     assert update["row"]["scope"] == "대상"
     assert any(problem["code"] == "D003" for problem in update["issues"])
+
+
+def test_line_numbers_keep_three_digits_in_import_storage_and_export(tmp_path):
+    client, app = client_for(tmp_path / "line-numbers.db")
+    try:
+        client.post("/api/organizations", params={"name": "품목란 번호 검증"}).raise_for_status()
+        base = "/api/org/1"
+        source = books.workbook([("원장", books.LINE, [
+            line(line=value, status="취소") for value in ["2", "001", "1000"]
+        ])])
+        result = client.post(base + "/import/lines", params={"name": "원장.xlsx"}, content=source)
+        assert result.raise_for_status().json()["imported"] == 3
+        with app.state.db.begin() as conn:
+            stored = conn.execute(store.declarations.select().order_by(store.declarations.c.id)).all()
+            assert [entry.data["line"] for entry in stored] == ["002", "001", "1000"]
+            old = stored[0]
+            conn.execute(store.declarations.update().where(store.declarations.c.id == old.id)
+                         .values(data=old.data | {"line": "2"}))
+        saved = client.get(base + "/data/lines").raise_for_status().json()
+        assert [row["line"] for row in saved] == ["002", "001", "1000"]
+        exported = client.get(base + "/export/lines").raise_for_status().content
+        workbook = load_workbook(BytesIO(exported))
+        assert [cell.value for cell in workbook.active["B"][1:]] == ["002", "001", "1000"]
+        workbook.close()
+    finally:
+        client.close()
+        app.state.db.dispose()
 
 
 @pytest.mark.parametrize("exclusion", [{"scope": "제외"}, {"status": "취소"}])

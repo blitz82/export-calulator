@@ -10,6 +10,8 @@ from alembic.config import Config
 from sqlalchemy import JSON, Column, ForeignKey, Integer, LargeBinary, MetaData, String, Table, UniqueConstraint, create_engine, event
 from sqlalchemy.engine import URL
 
+from epms.rules import format_line_number
+
 metadata = MetaData()
 organizations = Table("organizations", metadata, Column("id", Integer, primary_key=True),
                       Column("name", String, unique=True, nullable=False))
@@ -86,10 +88,17 @@ def engine_for(path=None):
 
 def records(conn, table, org):
     query = table.select().where(table.c.org == org).order_by(table.c.id)
+    rows = []
     if table is declarations:
         query = query.where(table.c.deleted == 0)
-    return [dict(item.data, id=item.id, revision=item.revision,
-                 **({"source": item.source} if table is declarations else {})) for item in conn.execute(query)]
+    for item in conn.execute(query):
+        row = dict(item.data, id=item.id, revision=item.revision)
+        if table is declarations:
+            row["source"] = item.source
+            if "line" in row:
+                row["line"] = format_line_number(row["line"])
+        rows.append(row)
+    return rows
 
 
 def log(conn, org, actor, entity, target, reason, before, after):

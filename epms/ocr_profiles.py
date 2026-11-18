@@ -81,7 +81,9 @@ def region_value(field, raw, date_or_hs_format="default"):
     if field in {"line", "version"}:
         pattern = r"([0-9]{1,8})(?:\s*/\s*[0-9]{1,8})?" if field == "line" else r"([0-9]{1,8})"
         match = re.fullmatch(pattern, raw)
-        return match[1] if match and int(match[1]) else None
+        if not match or not int(match[1]):
+            return None
+        return rules.format_line_number(match[1]) if field == "line" else match[1]
     if field in TEXT_FIELDS:
         # A region containing multiple rows can include a neighboring item or label.
         limit = 200 if field == "product" else 100

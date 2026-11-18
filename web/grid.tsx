@@ -10,6 +10,8 @@ import { dateInputHelp, HelpTip, ledgerHelp } from './help-tip'
 import { OcrInput } from './ocr-input'
 import { PdfPreview, type PdfSource } from './pdf-view'
 import { ProducerSelect } from './producer-select'
+import { formatLineNumber } from './line-number'
+import { findMemberCandidates, MemberCandidates, memberNames, normalizeCompany, normalizeNumber } from './member-candidates'
 
 ModuleRegistry.registerModules([AllCommunityModule])
 const theme = themeQuartz.withParams({accentColor:'#222', fontFamily:'inherit', fontSize:12,
@@ -33,24 +35,10 @@ const options: Record<string, string[]> = {
   kind:['생산자','수출업체','복수'], scope:['대상','제외','미확정'], status:['유효','취소','미확정'],
 }
 const roleKeys = new Set(['agent','owner','maker'])
-const normalizeNumber = (value:unknown) => String(value??'').normalize('NFKC').replace(/[\s-]/g,'')
-const normalizeCompany = (value:unknown) => String(value??'').normalize('NFKC').replace(/\s+|주식회사|\(주\)/g,'').toLowerCase()
-const memberNames = (row:Row) => [row.name,...String(row.aliases??'').split('|')].map(normalizeCompany).filter(Boolean)
-
-function nameRank(query:string, name:string) {
-  if (query===name) return 0
-  if (name.includes(query)) return 1
-  if (query.length<3 || Math.abs(query.length-name.length)>1) return Infinity
-  const [shorter,longer]=query.length<=name.length?[query,name]:[name,query]
-  const first=[...shorter].findIndex((letter,index)=>letter!==longer[index])
-  if (first===-1) return 2
-  const offset=shorter.length===longer.length?1:0
-  return shorter.slice(first+offset)===longer.slice(first+1)?2:Infinity
-}
 const visibleError = (message:string) => message.replace(/^[MD]\d{3}\s+/, '')
 const defaultLineFields = ['number','line','usd','hs','shipped','declared','agent_name','owner_name','maker_name']
 const internalLineFields = new Set(['line','version'])
-const newLineDefaults = {line:'1',version:'1',scope:'대상',status:'유효'}
+const newLineDefaults = {line:'001',version:'1',scope:'대상',status:'유효'}
 const isExcludedLine = (row?:Row) => row?.scope==='제외' || row?.status==='취소'
 const hasMissingIdentity = (row:Row) => [...internalLineFields].some(key=>!String(row[key]??'').trim())
 const hasInvalidIdentity = (row:Row) => [...internalLineFields].some(key=>{
@@ -358,13 +346,8 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
             void validate(next)
           }
           const memberName = /^(agent|owner|maker)_name$/.test(key)
-          const queryName = memberName ? normalizeCompany(roleName) : ''
-          const candidates = queryName && !matches ? (members.data??[])
-            .map(row=>({row,rank:Math.min(...memberNames(row).map(name=>nameRank(queryName,name)))}))
-            .filter(({row,rank})=>/^\d{10}$/.test(normalizeNumber(row.number))&&Number.isFinite(rank)&&
-              (role!=='maker'||row.kind==='생산자'||row.kind==='복수'))
-            .sort((a,b)=>a.rank-b.rank)
-            .slice(0,5) : []
+          const candidates = memberName && roleField && !matches
+            ? findMemberCandidates(members.data,roleName,'name',role==='maker') : []
           const inputId=`ledger-${kind}-${key}`
           const value=roleField&&key===stateKey?state:String(draft[key]??'')
           if (roleField&&key===stateKey&&!choices?.length) {
@@ -379,18 +362,17 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
             {choices ? <select id={inputId} name={key} aria-describedby={problems.length?`${inputId}-error`:undefined} aria-invalid={!!problems.length} value={choices.includes(value)?value:''} onChange={e => change(e.target.value)}>
               <option value="">선택</option>{choices.map(item => <option key={item}>{item}</option>)}
             </select> : <input id={inputId} name={key} title={kind==='lines'&&(key==='declared'||key==='shipped')?dateInputHelp:undefined} aria-describedby={problems.length?`${inputId}-error`:undefined} value={String(draft[key] ?? '')}
-              onChange={e => change(e.target.value)} aria-invalid={!!problems.length}/>}
+              onChange={e => change(e.target.value)} onBlur={key==='line' ? e=>{
+                const formatted = formatLineNumber(e.currentTarget.value)
+                if (formatted!==e.currentTarget.value) change(formatted)
+              } : undefined} aria-invalid={!!problems.length}/>}
             {!!problems.length&&<span className="field-error" id={`${inputId}-error`}>{problems.map(p=>p.message).join(' ')}</span>}
             </div>
-            {!!candidates.length&&<ul className="member-candidates" aria-label={`${label} 회원사 후보`}>
-              {candidates.map(({row})=><li key={row.id}>
-                <button type="button" onClick={()=>{
-                  const next={...draft,[key]:String(row.name),[role]:String(row.number),[stateKey]:''}
-                  setDraft(next)
-                  void validate(next)
-                }}>{String(row.name)} · {String(row.number)}</button>
-              </li>)}
-            </ul>}
+            <MemberCandidates members={candidates} label={label} onSelect={member=>{
+              const next={...draft,[key]:String(member.name),[role]:String(member.number),[stateKey]:''}
+              setDraft(next)
+              void validate(next)
+            }}/>
           </div>
           }
           const entries = Object.entries(displayFields)
@@ -398,11 +380,11 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
           return <>
             {showIdentity && <fieldset className="party-fields">
               <legend>품목란 번호와 정정 버전</legend>
-              <p className="muted">품목란이 하나인 최초 신고는 둘 다 1입니다. 품목란이 여러 개면 원본의 번호를, 정정 신고면 확인한 정정 차수를 입력하세요.</p>
+              <p className="muted">품목란이 하나인 최초 신고는 품목란 번호 001, 정정 버전 1입니다. 품목란이 여러 개면 원본의 번호를, 정정 신고면 확인한 정정 차수를 입력하세요.</p>
               {hasMissingIdentity(draft) && <button type="button" onClick={()=>{
                 const next = {...draft}
                 for (const key of internalLineFields) {
-                  if (!String(next[key]??'').trim()) next[key]='1'
+                  if (!String(next[key]??'').trim()) next[key]=key==='line' ? '001' : '1'
                 }
                 setDraft(next)
                 void validate(next)
