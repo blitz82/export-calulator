@@ -8,7 +8,7 @@ import { download, get, request, send } from './api'
 import { useSearchParams } from 'react-router-dom'
 import { dateInputHelp, HelpTip, ledgerHelp } from './help-tip'
 import { OcrInput } from './ocr-input'
-import { PdfView, type PdfSource } from './pdf-view'
+import { PdfPreview, type PdfSource } from './pdf-view'
 import { ProducerSelect } from './producer-select'
 
 ModuleRegistry.registerModules([AllCommunityModule])
@@ -79,6 +79,7 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
   const members = useQuery({queryKey:[`org/${org}/data/members`], queryFn:() => get<Row[]>(`org/${org}/data/members`), enabled:kind==='lines'})
   const [selected, setSelected] = useState<Row>()
   const [draft, setDraft] = useState<Row>({})
+  const [showPdf, setShowPdf] = useState(false)
   const [issues, setIssues] = useState<Problem[]>([])
   const [search, setSearch] = useState('')
   const [message, setMessage] = useState('')
@@ -91,8 +92,11 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
   const grid = useRef<GridApi<Row> | null>(null)
   const nextIssue = useRef(0)
   const form = useRef<HTMLFormElement>(null)
+  const pdfButton = useRef<HTMLButtonElement>(null)
   const excelFile = useRef<HTMLInputElement>(null)
   const dirty = selected && Object.keys(fields).some(key => String(selected[key] ?? '') !== String(draft[key] ?? ''))
+  const selectedPdf = selected && draft.pdf
+  const comparingPdf = showPdf ? selectedPdf : undefined
   const visibleRows = useMemo(() => problemOnly ? rows.filter(row=>rowChecks[String(row.id)]?.some(p=>p.severity!=='INFO')) : rows,
     [rows, problemOnly, rowChecks])
   useEffect(() => {
@@ -149,6 +153,7 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
     if (dirty && !window.confirm('저장하지 않은 변경사항을 취소하시겠습니까?')) return
     const initial = row ?? (kind==='lines' ? newLineDefaults : {})
     nextIssue.current = 0
+    setShowPdf(false)
     setSelected(initial)
     setDraft({...initial})
     setShowIdentity(kind==='lines' && (hasInvalidIdentity(initial)
@@ -181,7 +186,7 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
   const focus = (field: string) => {
     const api = grid.current
     const rowIndex = draft.id ? api?.getRowNode(String(draft.id))?.rowIndex : undefined
-    if (api && rowIndex != null && api.getColumn(field)) {
+    if (!comparingPdf && api && rowIndex != null && api.getColumn(field)) {
       if (hidden.includes(field)) setHidden(current=>current.filter(key=>key!==field))
       api.ensureIndexVisible(rowIndex)
       requestAnimationFrame(() => api.ensureColumnVisible(field))
@@ -198,6 +203,10 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
   }
   const reload = async () => {
     await Promise.all([query.refetch(), ...(kind==='lines' ? [checks.refetch()] : [])])
+  }
+  const closePdf = () => {
+    setShowPdf(false)
+    pdfButton.current?.focus()
   }
   const save = async () => {
     if (kind==='lines' && !draft.id && !isExcludedLine(draft) && hasInvalidIdentity(draft)) {
@@ -272,21 +281,32 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
         </p>)}
       </div>)}
     </details>}
-    <div className="ledger-split"><div className="grid-shell ledger-grid"><AgGridReact<Row> theme={kind==='members' ? memberTheme : theme} onGridReady={event => {grid.current=event.api}}
+    <div className={`ledger-split${comparingPdf ? ' ledger-comparing-pdf' : ''}`}>
+    <div className="grid-shell ledger-grid" hidden={!!comparingPdf}><AgGridReact<Row> theme={kind==='members' ? memberTheme : theme} onGridReady={event => {grid.current=event.api}}
       rowData={visibleRows} columnDefs={columns} quickFilterText={search} loading={query.isLoading || (problemOnly && checks.isLoading)}
       tooltipShowDelay={0} tooltipHideDelay={0}
       getRowId={p => String(p.data.id)} defaultColDef={{sortable:true,resizable:true,filter:false,suppressHeaderMenuButton:true,suppressHeaderFilterButton:true}} onRowClicked={e => {if (!busy) select(e.data)}}
       rowClassRules={{'selected-ledger-row':p=>!!draft.id&&p.data?.id===draft.id}}
       onCellKeyDown={e => {if (!busy && (e.event as KeyboardEvent)?.key === 'Enter') select(e.data)}}
       overlayNoRowsTemplate="등록된 자료가 없습니다."/></div>
+    {comparingPdf && <div className="ledger-pdf" id="ledger-pdf-preview">
+      <PdfPreview key={`${org}:${draft.id}:${comparingPdf.file}:${comparingPdf.page}`} org={org} pdf={comparingPdf}
+        line={String(selected?.line ?? '')} onClose={closePdf}/>
+    </div>}
     {selected && <form ref={form} className="ledger-editor" onSubmit={e => {e.preventDefault(); void action(save)}}>
-      <div className="section-top"><h2>{draft.id ? `행 수정 · ${draft.id}` : '새 행 입력'}</h2>
+      <div className="section-top">
+        <div className="ledger-editor-title">
+          <h2>{draft.id ? `행 수정 · ${draft.id}` : '새 행 입력'}</h2>
+          {selectedPdf && <small>신고번호 {String(draft.number || '미입력')} · 품목란 {String(draft.line || '미입력')} · 원본 {selectedPdf.page}쪽</small>}
+          {selectedPdf && <button type="button" ref={pdfButton} aria-expanded={!!comparingPdf}
+            aria-controls={comparingPdf ? 'ledger-pdf-preview' : undefined}
+            onClick={()=>setShowPdf(!showPdf)}>{comparingPdf ? 'PDF 접기' : 'PDF 보기'}</button>}
+        </div>
         <button type="button" disabled={busy} onClick={() => {
           if (dirty && !window.confirm('저장하지 않은 변경사항을 취소하시겠습니까?')) return
-          ++validation.current; setSelected(undefined)
+          ++validation.current; setShowPdf(false); setSelected(undefined)
         }}>닫기</button></div>
       <div className="editor-scroll">
-      {draft.pdf && <PdfView key={draft.id} org={org} pdf={draft.pdf}/>}
       {issues.some(p=>p.severity!=='INFO') && <div className="issue-list" aria-label="선택 행 검증 결과">
         <div className="section-top"><b>확인 필요 {new Set(issues.filter(p=>p.severity!=='INFO').map(p=>p.field)).size}개</b><button type="button" onClick={() => {
           const items = issues.filter(p=>p.severity!=='INFO')

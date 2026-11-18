@@ -85,9 +85,17 @@ button[aria-pressed=true] { background:#f2f2f2; border-color:#222; color:#555555
 .ledger-status > span:first-child { font-weight:700; }
 .ledger-split { display:flex; gap:12px; height:max(310px, calc(100dvh - 298px)); }
 .ledger-split .grid-shell { flex:1; }
+.ledger-split .grid-shell[hidden] { display:none; }
 .ledger-editor { flex:0 0 clamp(265px,31%,380px); min-width:0; display:flex; flex-direction:column; border:1px solid #222; border-radius:var(--panel-radius); background:#fff; }
 .ledger-editor > .section-top { padding:10px; background:#f9f9f9; border-bottom:1px solid #222; border-radius:var(--panel-radius) var(--panel-radius) 0 0; }
 .ledger-editor h2 { margin:0; font-size:15px; }
+.ledger-editor-title { display:grid; gap:5px; min-width:0; justify-items:start; overflow-wrap:anywhere; }
+.ledger-pdf { flex:1; min-width:0; min-height:0; display:flex; border:1px solid var(--control-border); border-radius:var(--panel-radius); background:#fff; }
+.ledger-pdf .stored-pdf-preview { flex:1; min-width:0; min-height:0; display:flex; flex-direction:column; gap:6px; padding:10px; }
+.stored-pdf-preview h2 { margin:0; font-size:15px; }
+.stored-pdf-preview > p { margin:0; overflow-wrap:anywhere; }
+.ledger-pdf .ocr-page { flex:1; min-height:0; height:auto; }
+.ledger-comparing-pdf .ledger-editor { flex-basis:clamp(260px,40%,450px); }
 .editor-scroll { flex:1; min-height:0; overflow:auto; padding:10px; }
 .ledger-editor .entry { grid-template-columns:minmax(0,1fr); }
 .editor-actions { margin:0; padding:9px; border-top:1px solid #222; }
@@ -210,6 +218,13 @@ aside :is(button,summary,a):focus-visible { outline-color:#e5f0e8; }
   .ledger-split:has(.ledger-editor) { flex-direction:column; height:auto; }
   .ledger-split:has(.ledger-editor) .grid-shell { flex:none; height:310px; }
   .ledger-editor { flex:auto; }
+}
+@media (min-width:621px) and (max-width:850px) {
+  .ledger-split.ledger-comparing-pdf:has(.ledger-editor) { flex-direction:row; height:max(400px, calc(100dvh - 298px)); }
+}
+@media (max-width:620px) {
+  .ledger-comparing-pdf .ledger-pdf { flex:none; height:48dvh; min-height:260px; }
+  .ledger-comparing-pdf .ledger-editor { flex:auto; max-height:55dvh; min-height:280px; }
 }
 @media (max-width:580px) {
   .layout { grid-template-columns:minmax(0,1fr); }
