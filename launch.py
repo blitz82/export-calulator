@@ -7,7 +7,6 @@ import socket
 import subprocess
 import sys
 import threading
-import webbrowser
 from pathlib import Path
 
 import uvicorn
@@ -116,15 +115,26 @@ def desktop(app, server, listener, port):
         thread.join(timeout=15)
 
 
+def configure_ocr_policy():
+    # Preserve any administrator/user policy; match the old CMD process-only setting.
+    powershell = Path(os.environ.get("SystemRoot", "C:/Windows")) / "System32/WindowsPowerShell/v1.0/powershell.exe"
+    result = subprocess.run([str(powershell), "-NoProfile", "-NonInteractive", "-Command",
+                             "if ((Get-ExecutionPolicy -List).Where({$_.ExecutionPolicy -ne 'Undefined'}).Count) { exit 1 }"],
+                            creationflags=subprocess.CREATE_NO_WINDOW, capture_output=True)
+    if result.returncode == 0:
+        os.environ["PSExecutionPolicyPreference"] = "RemoteSigned"
+
+
 def main():
+    if getattr(sys, "frozen", False):
+        configure_ocr_policy()
     os.environ.setdefault("EPMS_SORTING_ENABLED", "1")
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, default=0)
     parser.add_argument("--db")
     parser.add_argument("--no-browser", action="store_true")
-    parser.add_argument("--browser", action="store_true", help="Open the local app in the default PC browser")
     args = parser.parse_args()
-    if not args.no_browser and not args.browser and getattr(sys, "frozen", False):
+    if not args.no_browser and getattr(sys, "frozen", False):
         fixed_runtime = Path(sys.executable).parent / "WebView2" / "msedgewebview2.exe"
         if not fixed_runtime.is_file() and not has_webview2():
             show_webview2_download()
@@ -136,19 +146,11 @@ def main():
         server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, access_log=False,
                                                log_config=None, timeout_graceful_shutdown=10))
         try:
-            if args.no_browser or args.browser:
+            if args.no_browser:
                 def stop_server():
                     server.should_exit = True
 
                 app.state.shutdown = stop_server
-                if args.browser:
-                    def open_browser():
-                        import time
-                        while not server.started and not server.should_exit:
-                            time.sleep(0.1)
-                        if server.started:
-                            webbrowser.open(f"http://127.0.0.1:{port}/")
-                    threading.Thread(target=open_browser, daemon=True).start()
                 server.run(sockets=[listener])
             else:
                 desktop(app, server, listener, port)

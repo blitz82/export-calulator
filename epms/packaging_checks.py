@@ -66,7 +66,7 @@ def preflight(variant, webview):
     if not package.get("version") or lock.get("version") != package["version"]:
         raise ValueError("The package.json and package-lock.json release versions disagree.")
     return {"version": package["version"], "variant": variant, "architecture": "x64", "python": platform.python_version(),
-            "sorting": {"feature_default": False, "operation_mode": "REVIEW_ONLY", "operational_approval": False},
+            "sorting": {"feature_default": True, "operation_mode": "SETTLEMENT_REFERENCE", "operational_approval": False},
             "pyinstaller": versions["pyinstaller"], "webview2": runtime, "migrations": migrations,
             "ocr_template": {"id": template["id"], "version": template["version"]},
             "ocr_extraction_version": EXTRACTION_VERSION,

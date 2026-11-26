@@ -1,54 +1,37 @@
 from types import SimpleNamespace
 import sys
-import threading
 
 import pytest
 
 import launch
 
 
-@pytest.mark.parametrize('mode', ['--browser', '--no-browser'])
-def test_local_launch_enables_current_features_and_uses_selected_database(tmp_path, monkeypatch, mode):
+@pytest.mark.parametrize('headless', [False, True])
+def test_native_launch_uses_one_database_and_enables_features(tmp_path, monkeypatch, headless):
     monkeypatch.delenv('EPMS_SORTING_ENABLED', raising=False)
     database = str(tmp_path / 'same-local.db')
-    monkeypatch.setattr(sys, 'argv', ['launch.py', mode, '--db', database])
+    monkeypatch.setattr(sys, 'argv', ['launch.py', '--db', database] + (['--no-browser'] if headless else []))
     observed = {}
-    opened = threading.Event()
     app = SimpleNamespace(state=SimpleNamespace(db=SimpleNamespace(dispose=lambda: observed.update(disposed=True))))
-
     def create_app(path):
         observed.update(path=path, enabled=launch.os.environ.get('EPMS_SORTING_ENABLED'))
         return app
-
-    def open_browser(url):
-        observed['url'] = url
-        opened.set()
-
     class Server:
-        started = False
-        should_exit = False
-
         def __init__(self, config):
             pass
-
         def run(self, sockets):
-            observed['address'] = sockets[0].getsockname()
-            self.started = True
-            if mode == '--browser':
-                assert opened.wait(3)
-
+            observed['server'] = sockets[0].getsockname()
+    def desktop(app, server, listener, port):
+        observed['native'] = ('127.0.0.1', port)
     monkeypatch.setattr(launch, 'create_app', create_app)
     monkeypatch.setattr(launch.uvicorn, 'Server', Server)
-    monkeypatch.setattr(launch.webbrowser, 'open', open_browser)
+    monkeypatch.setattr(launch, 'desktop', desktop)
     launch.main()
     assert observed['path'] == database
     assert observed['enabled'] == '1'
-    assert observed['address'][0] == '127.0.0.1'
     assert observed['disposed']
-    if mode == '--browser':
-        assert observed['url'] == f"http://127.0.0.1:{observed['address'][1]}/"
-    else:
-        assert not opened.is_set()
+    assert observed['server' if headless else 'native'][0] == '127.0.0.1'
+    assert ('native' in observed) != headless
 
 
 def test_fixed_runtime_license_opens_full_terms_and_records_acceptance(tmp_path, monkeypatch):

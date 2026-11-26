@@ -50,26 +50,15 @@ if (!$Lite) {
 }
 Copy-Item -LiteralPath $guide -Destination "$distPath/$appName/실행 안내.txt"
 $packageDir = Join-Path $distPath $appName
-Copy-Item -LiteralPath "Start-EPMS-Sorting-Review.cmd" -Destination $packageDir
-Copy-Item -LiteralPath "Start-EPMS-Offline-Browser.cmd" -Destination $packageDir
-if ($Lite) {
-    Copy-Item -LiteralPath "Start-EPMS-OCR.cmd" -Destination $packageDir
-} else {
-    Rename-Item -LiteralPath (Join-Path $packageDir "$appName.exe") -NewName "EPMS.exe"
-    Copy-Item -LiteralPath "Start-EPMS-Portable.cmd" -Destination (Join-Path $packageDir "공동정산 수출실적 관리 시작.cmd")
-    Copy-Item -LiteralPath "Start-EPMS-Portable.cmd" -Destination $packageDir
-}
+Rename-Item -LiteralPath (Join-Path $packageDir "$appName.exe") -NewName "프로그램 시작.exe"
 Copy-Item -LiteralPath "docs/OCR_REVIEW_WORKFLOW.md" -Destination "$packageDir/OCR 안내.md"
 Copy-Item -LiteralPath "docs/OCR_TEMPLATE_GUIDE.md" -Destination $packageDir
 Copy-Item -LiteralPath "docs/SETTLEMENT_WORKFLOW.md" -Destination $packageDir
 Copy-Item -LiteralPath "docs/SUPPORT_BUDGET_WORKFLOW.md" -Destination $packageDir
 Copy-Item -LiteralPath "docs/MONTHLY_REPORT_WORKFLOW.md" -Destination $packageDir
 Copy-Item -LiteralPath "docs/MONTHLY_WORKFLOW_GUIDE.md" -Destination $packageDir
-if (Test-Path -LiteralPath "docs/sorting" -PathType Container) {
-    Copy-Item -LiteralPath "docs/sorting" -Destination (Join-Path $packageDir "sorting-guide") -Recurse -Force
-}
 Copy-Item -LiteralPath "docs/OPEN_SOURCE_COMPLIANCE.md" -Destination "$distPath/$appName/오픈소스 검토 안내.md"
-Copy-Item -LiteralPath "docs/RELEASE_2_0_0.md" -Destination "$packageDir/RELEASE_NOTES.md"
+Copy-Item -LiteralPath "docs/RELEASE_2_0_1.md" -Destination "$packageDir/RELEASE_NOTES.md"
 & $Python -m epms.packaging_checks $variant --webview $WebViewRuntime --output (Join-Path $packageDir "build-info.json")
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 & $Python -m epms.oss_inventory "$distPath/$appName" $variant --analysis (Join-Path $OutputRoot "work/$variant/EPMS/Analysis-00.toc")
