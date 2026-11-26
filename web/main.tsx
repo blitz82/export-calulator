@@ -7,7 +7,7 @@ import type { Fields, Problem, Row } from './grid'
 import { HelpTip } from './help-tip'
 import { PdfView } from './pdf-view'
 import './style.css'
-import {WorkflowProvider,WorkflowBar,WorkflowRoute,WorkbenchHome,ArchiveWorkspace} from './workflow'
+import {WorkflowProvider,WorkflowBar,WorkflowRoute,WorkbenchHome,WorkspaceIntro,ArchiveWorkspace} from './workflow'
 
 const LedgerGrid = lazy(() => import('./grid').then(module => ({default:module.LedgerGrid})))
 const FacilityRegistry = lazy(() => import('./facility-registry').then(module => ({default:module.FacilityRegistry})))
@@ -17,7 +17,7 @@ const SortingIntakeWorkspace = lazy(() => import('./sorting-intake').then(module
 const SupportBudgetWorkspace = lazy(() => import('./support-budget').then(module => ({default:module.SupportBudgetWorkspace})))
 const MonthlyReportWorkspace = lazy(() => import('./monthly-report').then(module => ({default:module.MonthlyReportWorkspace})))
 const menus = [
-  ['/', '업무 시작', '품목의 등록 현황과 지금 할 일을 확인합니다.'],
+  ['/', '업무 안내', '자료 등록·월별 정산·연간 실적의 이동 경로를 안내합니다.'],
   ['/members', '회원사 명부', '회원사를 추가하거나 Excel 명부를 가져옵니다.'],
   ['/lines', '수출신고필증 등록', '수출신고필증의 품목란을 입력하고 보완합니다.'],
   ['/calculate', '수출실적 계산', '연도별 정책을 적용해 직접·간접 수출실적을 계산합니다.'],
@@ -402,7 +402,7 @@ function WorkMenu() {
   const {pathname,search} = useLocation()
   const management=[...menus.slice(6,9),menus[9]]
   const active=management.some(([path])=>path===pathname)
-  if(sorting.data?.feature_enabled)return <nav className="work-menu" aria-label="업무 메뉴"><NavLink to="/" end>업무 시작</NavLink><details className="management-menu" open><summary>자료 등록·관리</summary><NavLink to="/lines">수출신고필증 등록</NavLink><NavLink to="/sorting-records">선별기록·증빙 등록</NavLink></details><NavLink to="/settlement-work">공동선별비 정산·제출</NavLink><NavLink to="/submission">회원사별 수출실적</NavLink><NavLink to="/archives">제출자료 보관함</NavLink><details className="management-menu" open={['/members','/contracts','/facilities','/support-budgets','/settings','/help'].includes(pathname)}><summary>기준정보·설정</summary><NavLink to="/members">회원사 명부</NavLink><NavLink to="/contracts">계약서 등록</NavLink><NavLink to="/facilities">공동선별장 명부</NavLink><NavLink to="/support-budgets">공동선별비 지원기준·배정</NavLink><NavLink to="/settings">조직·실적 기준·백업</NavLink><NavLink to="/help">사용 안내</NavLink></details></nav>
+  if(sorting.data?.feature_enabled)return <nav className="work-menu" aria-label="업무 메뉴"><details className="management-menu" open><summary>자료 등록·관리</summary><NavLink to="/lines">수출신고필증 등록</NavLink><NavLink to="/sorting-records">선별기록·증빙 등록</NavLink></details><NavLink to="/settlement-work">공동선별비 정산·제출</NavLink><NavLink to="/submission">회원사별 수출실적</NavLink><NavLink to="/archives">제출자료 보관함</NavLink><details className="management-menu" open={['/members','/contracts','/facilities','/support-budgets','/settings','/help'].includes(pathname)}><summary>기준정보·설정</summary><NavLink to="/members">회원사 명부</NavLink><NavLink to="/contracts">계약서 등록</NavLink><NavLink to="/facilities">공동선별장 명부</NavLink><NavLink to="/support-budgets">공동선별비 지원기준·배정</NavLink><NavLink to="/settings">조직·실적 기준·백업</NavLink><NavLink to="/help">사용 안내</NavLink></details></nav>
   return <nav className="work-menu" aria-label="업무 메뉴">
     <MenuLink item={menus[0]}/>
     <MenuLink item={menus[1]}/>
@@ -452,7 +452,7 @@ function App() {
         <div className="page-title"><h1>{label}</h1></div>
         {path==='/'&&office.isSuccess&&!org?<Navigate to="/settings" replace/> :
           path==='/settings'?office.isSuccess&&<Settings org={org} choices={office.data.choices} refresh={refresh}/> : path==='/help'?<Help/> :
-          requiresOrg(org && (path==='/'?(sorting.data?.feature_enabled?<WorkbenchHome org={org}/>:<Dashboard org={org}/>) : path==='/members'||path==='/lines' ?
+          requiresOrg(org && (path==='/'?(sorting.data?.feature_enabled?<WorkspaceIntro/>:<Dashboard org={org}/>) : path==='/members'||path==='/lines' ?
           (fields.data && <Suspense fallback={<p role="status">원장을 불러오는 중…</p>}>
             <LedgerGrid key={org.id+path} org={org.id} kind={path==='/members'?'members':'lines'}
               fields={fields.data[path==='/members'?'members':'lines']}/>
@@ -465,7 +465,7 @@ function App() {
       </>}/>} {sorting.data?.feature_enabled&&<Route path="/sorting-records" element={requiresOrg(org&&<Suspense fallback={<p role="status">접수 자료를 불러오는 중…</p>}><SortingIntakeWorkspace key={org.id} org={org}/></Suspense>)}/>}{sorting.data?.feature_enabled&&<Route path="/support-budgets" element={requiresOrg(org&&<Suspense fallback={<p role="status">지원기준을 불러오는 중…</p>}><SupportBudgetWorkspace key={org.id} org={org}/></Suspense>)}/>}{sorting.data?.feature_enabled&&<Route path="/monthly-reports" element={requiresOrg(org&&<Suspense fallback={<p role="status">월별 보고를 불러오는 중…</p>}><MonthlyReportWorkspace key={org.id} org={org}/></Suspense>)}/>}<Route path="/contracts" element={<>
         <div className="page-title"><h1>계약서 등록</h1></div>
         {requiresOrg(org&&<Suspense fallback={<p role="status">계약 화면을 불러오는 중…</p>}><ContractsWorkspace key={org.id} org={org}/></Suspense>)}
-      </>}/><Route path="/settlement-work" element={requiresOrg(org&&<><h1>공동선별비 정산·제출</h1><WorkbenchHome org={org} monthly/></>)}/><Route path="/reference" element={<Navigate to="/settings" replace/>}/><Route path="/archives" element={requiresOrg(org&&<><h1>제출자료 보관함</h1><ArchiveWorkspace org={org.id}/></>)}/></Routes></WorkflowRoute></div>
+      </>}/><Route path="/settlement-work" element={requiresOrg(org&&<><h1>공동선별비 정산·제출</h1><WorkbenchHome org={org}/></>)}/><Route path="/reference" element={<Navigate to="/settings" replace/>}/><Route path="/archives" element={requiresOrg(org&&<><h1>제출자료 보관함</h1><ArchiveWorkspace org={org.id}/></>)}/></Routes></WorkflowRoute></div>
     </main></div></WorkflowProvider>
 }
 

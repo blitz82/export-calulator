@@ -10,7 +10,7 @@ test('independent receipt → OCR/manual rows → paid cost → settlement → i
   const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message))
   page.on('dialog',d=>d.accept())
   await page.goto('/#/sorting-records')
-  await expect(page.getByRole('navigation',{name:'업무 메뉴',exact:true}).getByRole('link',{name:'업무 시작',exact:true})).toBeVisible()
+  await expect(page.getByRole('navigation',{name:'업무 메뉴',exact:true}).getByRole('link',{name:'업무 시작',exact:true})).toHaveCount(0)
   const menu=await page.getByRole('navigation',{name:'업무 메뉴',exact:true}).getByRole('link').allTextContents()
   expect(menu).toContain('기준정보·연도 설정');expect(menu).toContain('제출자료 보관함')
   await page.getByRole('button',{name:'자료 접수 등록',exact:true}).click()

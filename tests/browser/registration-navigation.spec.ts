@@ -3,11 +3,14 @@ import {test,expect} from '@playwright/test'
 test.skip(process.env.EPMS_REGISTRATION_E2E!=='1','Requires the local synthetic sandbox')
 test('separates all-period registration, monthly settlement and annual exports',async({page})=>{
   const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message))
+  const monthlyRequests:string[]=[];page.on('request',r=>{if(r.url().includes('/workspace?'))monthlyRequests.push(r.url())})
   await page.goto('/#/')
-  await expect(page.getByRole('heading',{name:'업무 시작',exact:true})).toBeVisible()
+  await expect(page.getByRole('heading',{name:'업무 안내',exact:true})).toBeVisible()
   await expect(page.getByRole('heading',{name:'자료 등록하기',exact:true})).toBeVisible()
   await expect(page.getByLabel('공동선별비 정산월',{exact:true})).toHaveCount(0)
+  expect(monthlyRequests).toEqual([])
   const nav=page.getByRole('navigation',{name:'업무 메뉴',exact:true})
+  await expect(nav.getByRole('link',{name:'업무 시작',exact:true})).toHaveCount(0)
   await nav.getByRole('link',{name:'공동선별비 정산·제출',exact:true}).click()
   await page.getByLabel('공동선별비 정산월',{exact:true}).fill('2026-07')
   await expect(page.getByRole('heading',{name:'2026년 7월 업무',exact:true})).toBeVisible()
@@ -29,8 +32,10 @@ test('separates all-period registration, monthly settlement and annual exports',
   await expect(page.getByLabel('공동선별비 정산월',{exact:true})).toHaveValue('2026-07')
   await nav.getByRole('link',{name:'회원사별 수출실적',exact:true}).click()
   await expect(page.getByLabel('공동선별비 정산월',{exact:true})).toHaveCount(0)
-  await nav.getByRole('link',{name:'업무 시작',exact:true}).click()
-  for(const width of [1280,820,500]){
+  await expect(nav.getByRole('link',{name:'업무 시작',exact:true})).toHaveCount(0)
+  await expect(nav.getByRole('link',{name:'업무 안내',exact:true})).toHaveCount(0)
+  await page.goto('/#/')
+  for(const width of [1280,1600]){
     await page.setViewportSize({width,height:950})
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy()
   }
