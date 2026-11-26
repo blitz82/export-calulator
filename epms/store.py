@@ -93,6 +93,8 @@ def records(conn, table, org):
         query = query.where(table.c.deleted == 0)
     for item in conn.execute(query):
         row = dict(item.data, id=item.id, revision=item.revision)
+        if table is memberships:
+            row.setdefault('number',item.number)
         if table is declarations:
             row["source"] = item.source
             if "line" in row:

@@ -1,0 +1,25 @@
+import {test,expect} from '@playwright/test'
+test.skip(process.env.EPMS_ARCHIVE_E2E!=='1','Requires a disposable DB from seed_archive_browser.py')
+
+test('archive opens without a new job and safely releases historical quantity and cost',async({page,request})=>{
+  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message))
+  const token=(await(await request.get('/api/session')).json()).token,headers={'x-epms-token':token}
+  const before=await(await request.get('/api/org/1/sorting/archive',{headers})).json()
+  expect(before).toHaveLength(1);expect(before[0].active_quantity).toBe('600');expect(before[0].active_cost).toBe('400')
+  expect((await request.post('/api/org/1/sorting/claims',{headers,data:{}})).status()).toBe(410)
+  expect((await request.post('/api/org/1/sorting/paper-cases',{headers,data:{}})).status()).toBe(410)
+  await page.goto('/#/sorting')
+  await page.getByText('종전 공동선별 자료·예약 보관함',{exact:true}).click()
+  await page.getByRole('button',{name:'예약 상세 보기',exact:true}).click()
+  await expect(page.getByText('활성 예약: 600 kg · 비용 400원',{exact:true})).toBeVisible()
+  await expect(page.getByText('종전 7월 선별',{exact:true})).toBeVisible()
+  const pending=page.waitForEvent('download');await page.getByRole('button',{name:'종전 검토 Excel',exact:true}).click();await(await pending).saveAs('output/cleanup-legacy-report.xlsx')
+  await page.getByLabel('종전 예약 해제 사유',{exact:true}).fill('사용하지 않는 종전 예약 종료')
+  await page.getByRole('button',{name:'종전 예약 해제·잔량 환원',exact:true}).click()
+  await expect(page.getByText('해제할 활성 예약이 없습니다.',{exact:true})).toBeVisible()
+  const after=await(await request.get('/api/org/1/settlements/catalog',{headers})).json()
+  expect(after.batches[0].available).toBe('1000');expect(after.declarations[0].available).toBe('1000')
+  await expect(page.getByRole('button',{name:'종전 예약 해제·잔량 환원',exact:true})).toHaveCount(0)
+  await page.screenshot({path:'output/cleanup-archive.png',fullPage:true})
+  expect(errors).toEqual([])
+})

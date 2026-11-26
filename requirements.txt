@@ -5,5 +5,7 @@ alembic==1.20.1
 openpyxl==3.1.5
 pypdfium2==5.13.0
 Pillow==13.0.0
+reportlab==4.4.9
+pypdf==6.21.4
 tzdata==2026.6
 pywebview==6.2.1; sys_platform == "win32"

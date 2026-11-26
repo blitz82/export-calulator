@@ -1,3 +1,4 @@
+import {validationMessage} from './validation-message'
 const token = fetch('/api/session').then(async response => {
   if (!response.ok) throw new Error('프로그램 연결을 확인하세요.')
   return (await response.json()).token as string
@@ -9,7 +10,7 @@ export async function request(path: string, init?: RequestInit, handledStatuses:
   const response = await fetch('/api/' + path, {...init, headers})
   if (!response.ok && !handledStatuses.includes(response.status)) {
     const error = await response.json().catch(() => ({}))
-    throw new Error(typeof error.detail === 'string' ? error.detail : '요청을 완료하지 못했습니다.')
+    throw new Error(validationMessage(error.detail))
   }
   return response
 }

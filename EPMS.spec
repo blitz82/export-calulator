@@ -11,6 +11,8 @@ datas += [(str(file), 'epms/migrations/versions') for file in sorted(Path('epms/
 binaries = []
 hiddenimports = []
 datas += collect_data_files('tzdata')
+datas += collect_data_files('reportlab')
+hiddenimports += collect_submodules('reportlab.pdfbase')
 datas += [('epms/windows_ocr.ps1', 'epms'), ('epms/ocr_unipass.json', 'epms')]
 tmp_ret = collect_all('pypdfium2_raw')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]

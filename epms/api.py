@@ -19,7 +19,7 @@ from sqlalchemy import func, select
 from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.exc import IntegrityError
 
-from epms import books, ocr, ocr_profiles, rules, store, submission
+from epms import books, contract_gate, ocr, ocr_profiles, rules, store, submission
 
 ROOT = Path(__file__).resolve().parents[1]
 FIELDS = {"members": books.MEMBER, "lines": books.LINE}
@@ -134,7 +134,7 @@ def create_app(path=None):
         index = member_index(conn, org)
         if kind == "members":
             return rules.validate_member(row, index.values())
-        problems = rules.validate_line(row, index)[0]
+        problems = rules.validate_line(row, index)[0] + contract_gate.evaluate(row, index, contract_gate.context(conn, org))[0]
         if rules.active_declaration_key(row) is not None:
             declarations = declaration_index(store.records(conn, store.declarations, org))
             problems.extend(declaration_issues(row, declarations, row["id"]))
@@ -215,9 +215,10 @@ def create_app(path=None):
             organization(conn, org)
             index = member_index(conn, org)
             rows = store.records(conn, store.declarations, org)
+            agreements = contract_gate.context(conn, org)
         declarations = declaration_index(rows)
         return {row["id"]: problems for row in rows
-                if (problems := rules.validate_line(row, index)[0] + declaration_issues(row, declarations, row["id"]))}
+                if (problems := rules.validate_line(row, index)[0] + contract_gate.evaluate(row, index, agreements)[0] + declaration_issues(row, declarations, row["id"]))}
 
     def declaration_index(rows):
         index = defaultdict(dict)
@@ -275,7 +276,7 @@ def create_app(path=None):
         if index is None:
             index = member_index(conn, org)
         issues = (rules.validate_member(row, index.values()) if kind == "members"
-                  else rules.validate_line(row, index)[0])
+                  else rules.validate_line(row, index)[0] + contract_gate.evaluate(row, index, contract_gate.context(conn, org))[0])
         if kind == "members" and any(p["severity"] == "ERROR" for p in issues):
             return {"issues": issues}
         key = rules.active_declaration_key(values) if declarations is not None else None
@@ -745,11 +746,12 @@ def create_app(path=None):
             rows = [] if template else store.records(conn, table, org)
             if kind == "lines" and not template:
                 index = member_index(conn, org)
+                agreements = contract_gate.context(conn, org)
                 declarations = declaration_index(rows)
                 rows = [
                     dict(row, issues="\n".join(
                         p["code"] + " " + p["message"]
-                        for p in rules.validate_line(row, index)[0] + declaration_issues(row, declarations, row["id"])
+                        for p in rules.validate_line(row, index)[0] + contract_gate.evaluate(row, index, agreements)[0] + declaration_issues(row, declarations, row["id"])
                     )) for row in rows
                 ]
             fields = FIELDS[kind] | ({"source": "원본 행 ID", "issues": "검증 결과"} if kind == "lines" and not template else {})
@@ -784,7 +786,7 @@ def create_app(path=None):
 
     def save_calculation(conn, org, name, policy, rows, members, request):
         year = policy["year"]
-        result = rules.calculate(rows, members, policy)
+        result = contract_gate.calculate(conn, org, rows, members, policy)
         result.update(rule=rules.VERSION, policy=policy, organization=name, rows=rows, members=members)
         stamp = store.now()
         run_id = conn.execute(store.runs.insert().values(org=org, year=year, time=stamp,
@@ -908,6 +910,13 @@ def create_app(path=None):
             return download(target.read_bytes(), "공동정산 수출실적 관리_백업.db", "application/octet-stream")
 
     def final_blocker(conn, org, run, annual=False):
+        rows = store.records(conn, store.declarations, org)
+        members = store.records(conn, store.memberships, org)
+        gate = contract_gate.validation(conn, org, rows, members, run['policy'])
+        if gate['checks']:
+            return gate['checks'][0]['message']
+        if run.get('contract_validation') != gate:
+            return '계약 확인 결과가 변경되었습니다. 계약서 등록을 확인하고 현재 자료로 다시 검토하세요.'
         if run.get("rule") != rules.VERSION:
             return "계산 규칙이 변경되었습니다. 다시 계산하세요."
         if not run["ready"] or (not annual and not run["accepted_lines"]):
@@ -920,7 +929,7 @@ def create_app(path=None):
         if run["members"] != members or run["policy"] != policy:
             return "원장, 명부 또는 정책이 변경되었습니다. 다시 계산하세요."
         if run["rows"] != rows:
-            current = rules.calculate(rows, members, policy) if annual else None
+            current = contract_gate.calculate(conn, org, rows, members, policy) if annual else None
             if current is None or any(current[key] != run[key] for key in current):
                 return "원장, 명부 또는 정책이 변경되었습니다. 다시 계산하세요."
         if not annual and policy["cutoff"] != submission.CONFIG["cutoff"]:
@@ -948,7 +957,8 @@ def create_app(path=None):
                 latest = conn.execute(select(run_table.c.id, run_table.c.data).where(
                     run_table.c.org == org, run_table.c.year == value).order_by(run_table.c.id.desc()).limit(1)).first()
                 run_id, result = latest if latest else (None, None)
-                current = bool(result and result["rule"] == rules.VERSION and result["organization"] == name
+                gate = contract_gate.validation(conn, org, rows, members, policy) if policy else None
+                current = bool(result and result.get('contract_validation') == gate and result["rule"] == rules.VERSION and result["organization"] == name
                                and result["policy"] == policy and result["rows"] == rows and result["members"] == members)
                 if request.method == "POST" and not current:
                     run_id, _, result = save_calculation(conn, org, name, policy, rows, members, request)
@@ -974,6 +984,8 @@ def create_app(path=None):
         table = store.submissions
         key = "annual-v2"
         with db.begin() as conn:
+            if request.method == 'POST' and final:
+                conn.exec_driver_sql('BEGIN IMMEDIATE')
             item = organization(conn, org)
             run = get_run(conn, org, run_id)
             year = run["policy"]["year"]
@@ -990,6 +1002,9 @@ def create_app(path=None):
                 for result in (previous, run):
                     policy = conn.execute(select(policies.c.data).where(
                         policies.c.org == org, policies.c.year == result["policy"]["year"])).scalar()
+                    gate = contract_gate.validation(conn, org, rows, members, result['policy'])
+                    if result.get('contract_validation') != gate:
+                        fail(gate['checks'][0]['message'] if gate['checks'] else '계약 확인 결과가 변경되었습니다. 계약서 등록을 확인하고 현재 자료로 다시 검토하세요.', 409)
                     if (result["rows"] != rows or result["members"] != members or result["policy"] != policy
                             or result["organization"] != item or result["rule"] != rules.VERSION):
                         fail("확정 이후 자료가 변경되었거나 검토 결과가 오래되었습니다. 현재 자료를 다시 검토하세요.", 409)
@@ -1045,6 +1060,8 @@ def create_app(path=None):
     def submit(org: int, first_id: int, second_id: int, sheet: str, request: Request, final: bool = False):
         table = store.submissions
         with db.begin() as conn:
+            if final:
+                conn.exec_driver_sql('BEGIN IMMEDIATE')
             name = organization(conn, org)
             first, second = (get_run(conn, org, i) for i in (first_id, second_id))
             if (first["policy"]["year"], second["policy"]["year"]) != (2025, 2026):
@@ -1054,6 +1071,12 @@ def create_app(path=None):
                                         table.c.second_run == second_id, table.c.sheet == sheet)).scalar()
                 if existing is not None:
                     return download(existing, f"공동정산_{name}_최종확정본.xlsx")
+                rows = store.records(conn, store.declarations, org)
+                members = store.records(conn, store.memberships, org)
+                for run in (first, second):
+                    gate = contract_gate.validation(conn, org, rows, members, run['policy'])
+                    if gate['checks']:
+                        fail(gate['checks'][0]['message'])
                 for run in (first, second):
                     blocker = final_blocker(conn, org, run)
                     if blocker:
@@ -1072,6 +1095,15 @@ def create_app(path=None):
                 store.log(conn, org, actor(request), "최종 확정", result.inserted_primary_key[0],
                           "2027년 제출양식 확정", None, {"first": first_id, "second": second_id})
             return download(data, f"공동정산_{name}_{'최종확정본' if final else '검증미완료'}.xlsx")
+
+    from epms.sorting_shared_api import install as install_sorting
+    install_sorting(app, db, organization, actor)
+
+    from epms.settlement_api import install as install_settlement
+    install_settlement(app, db, organization, actor)
+
+    from epms.member_contracts import install as install_contracts
+    install_contracts(app, db, organization, actor)
 
     license_root = (Path(sys.executable).parent if getattr(sys, "frozen", False) else ROOT) / "licenses"
     if license_root.is_dir():

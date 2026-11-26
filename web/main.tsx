@@ -7,15 +7,22 @@ import type { Fields, Problem, Row } from './grid'
 import { HelpTip } from './help-tip'
 import { PdfView } from './pdf-view'
 import './style.css'
+import {WorkflowProvider,WorkflowBar,WorkflowRoute,WorkbenchHome,ArchiveWorkspace} from './workflow'
 
 const LedgerGrid = lazy(() => import('./grid').then(module => ({default:module.LedgerGrid})))
+const FacilityRegistry = lazy(() => import('./facility-registry').then(module => ({default:module.FacilityRegistry})))
+const ContractsWorkspace = lazy(() => import('./contracts').then(module => ({default:module.ContractsWorkspace})))
+const SortingWorkspace = lazy(() => import('./settlement').then(module => ({default:module.SettlementWorkspace})))
+const SortingIntakeWorkspace = lazy(() => import('./sorting-intake').then(module => ({default:module.SortingIntakeWorkspace})))
+const SupportBudgetWorkspace = lazy(() => import('./support-budget').then(module => ({default:module.SupportBudgetWorkspace})))
+const MonthlyReportWorkspace = lazy(() => import('./monthly-report').then(module => ({default:module.MonthlyReportWorkspace})))
 const menus = [
-  ['/', '업무 홈', '품목의 등록 현황과 지금 할 일을 확인합니다.'],
+  ['/', '업무 시작', '품목의 등록 현황과 지금 할 일을 확인합니다.'],
   ['/members', '회원사 명부', '회원사를 추가하거나 Excel 명부를 가져옵니다.'],
-  ['/lines', '신고 원장', '수출신고필증의 품목란을 입력하고 보완합니다.'],
+  ['/lines', '수출신고필증 등록', '수출신고필증의 품목란을 입력하고 보완합니다.'],
   ['/calculate', '수출실적 계산', '연도별 정책을 적용해 직접·간접 수출실적을 계산합니다.'],
   ['/results', '회원사별 실적 확인', '회원사별 인정 금액과 신고 품목란별 근거를 확인합니다.'],
-  ['/submission', '제출자료', '선택 연도와 직전 연도의 제출용 Excel을 준비합니다.'],
+  ['/submission', '회원사별 공동정산 수출실적', '선택 연도와 직전 연도의 제출용 Excel을 준비합니다.'],
   ['/audit', '감사 자료', '계산 근거, 원장 변경 이력 및 감사 증빙을 조회합니다.'],
   ['/checks', '상세 검증 이력', '이전 계산의 입력 및 계산 문제를 확인합니다.'],
   ['/settings', '프로그램 설정', '품목과 연도별 계산 정책을 등록하고 데이터 백업을 내려받습니다.'],
@@ -272,6 +279,7 @@ function SubmissionWorkspace({org,fields}: {org:Org;fields?:Record<'members'|'li
       }))} fields={{subject:'회원사명 또는 신고번호',field:'항목',message:'보완 내용'}} editLabel="수정하기"
         editLink={row=>row.member_id ? `/members?row=${row.member_id}&return=${returnTo}` :
           row.row_id ? `/lines?row=${row.row_id}&return=${returnTo}` : undefined}/>}
+      {result.checks.some(problem=>problem.code==='D090'||problem.code==='D092')&&<p role="alert">계약 관계 확인이 필요하여 최종 확정할 수 없습니다. <NavLink to="/contracts">계약서 등록 확인</NavLink></p>}
       <p>신고 기준 실수출액 <b>{formatNumber(result.actual_usd)} USD</b> · 회원사 귀속 인정액 <b>{formatNumber(result.attributed_usd)} USD</b>
         {result.actual_kg!==null&&result.actual_kg!=='0'&&<> · 신고 기준 순중량 <b>{formatNumber(result.actual_kg)} kg</b></>}</p>
       <details className="compact" open={result.ready}><summary>회원사별 실적</summary>
@@ -390,12 +398,21 @@ function MenuLink({item:[path,label,description]}: {item:typeof menus[number]}) 
 }
 
 function WorkMenu() {
+  const sorting=useQuery({queryKey:['sorting-capabilities'],queryFn:()=>get<{feature_enabled:boolean}>('sorting-capabilities')})
   const {pathname,search} = useLocation()
   const management=[...menus.slice(6,9),menus[9]]
   const active=management.some(([path])=>path===pathname)
+  if(sorting.data?.feature_enabled)return <nav className="work-menu" aria-label="업무 메뉴"><NavLink to="/" end>업무 시작</NavLink><details className="management-menu" open><summary>자료 등록·관리</summary><NavLink to="/lines">수출신고필증 등록</NavLink><NavLink to="/sorting-records">선별기록·증빙 등록</NavLink></details><NavLink to="/settlement-work">공동선별비 정산·제출</NavLink><NavLink to="/submission">회원사별 수출실적</NavLink><NavLink to="/archives">제출자료 보관함</NavLink><details className="management-menu" open={['/members','/contracts','/facilities','/support-budgets','/settings','/help'].includes(pathname)}><summary>기준정보·설정</summary><NavLink to="/members">회원사 명부</NavLink><NavLink to="/contracts">계약서 등록</NavLink><NavLink to="/facilities">공동선별장 명부</NavLink><NavLink to="/support-budgets">공동선별비 지원기준·배정</NavLink><NavLink to="/settings">조직·실적 기준·백업</NavLink><NavLink to="/help">사용 안내</NavLink></details></nav>
   return <nav className="work-menu" aria-label="업무 메뉴">
     <MenuLink item={menus[0]}/>
-    {[menus[1],menus[2],menus[5]].map(item=><MenuLink key={item[0]} item={item}/>)}
+    <MenuLink item={menus[1]}/>
+    <NavLink to="/contracts">계약서 등록</NavLink>
+    {sorting.data?.feature_enabled&&<NavLink to="/facilities">공동선별장 명부</NavLink>}
+    {sorting.data?.feature_enabled&&<NavLink to="/sorting-records">선별기록·증빙 등록</NavLink>}
+    {[menus[2],menus[5]].map(item=><MenuLink key={item[0]} item={item}/>)}
+    {sorting.data?.feature_enabled&&<NavLink to="/support-budgets">공동선별비 지원기준·배정</NavLink>}
+    {sorting.data?.feature_enabled&&<NavLink to="/sorting">공동선별비 정산</NavLink>}
+    {sorting.data?.feature_enabled&&<NavLink to="/monthly-reports">월별 정산·지급보고</NavLink>}
     <details className="management-menu" key={pathname+search} open={active}>
       <summary>설정·관리</summary>
       {management.map(item=><MenuLink key={item[0]} item={item}/>)}
@@ -403,7 +420,10 @@ function WorkMenu() {
   </nav>
 }
 
+const referenceDescriptions:Record<string,string>={'/members':'회원사명·사업자등록번호·회원자격을 관리합니다. 등록된 회원사는 계약·수출실적·공동선별비 업무에서 함께 사용합니다.','/contracts':'생산자회원사와 수출업체의 계약 내용·기간·원본 PDF를 관리합니다.','/facilities':'공동선별장 시설과 지정 증빙을 관리합니다. 일별·월별 작업 자료는 선별기록·증빙 등록에서 입력하세요.','/support-budgets':'연도와 적용 기간별 지원단가·총예산·회원사 배정한도를 관리합니다. 수출실적 계산 기준과는 별개입니다.','/settings':'조직 정보와 연도별 수출실적 인정기준을 설정하고 데이터를 백업합니다. 공동선별비 기준은 지원기준·배정에서 설정하세요.','/help':'자료 등록, 실적 계산, 공동선별비 정산·제출 방법을 확인합니다.'}
+
 function App() {
+  const sorting=useQuery({queryKey:['sorting-capabilities'],queryFn:()=>get<{feature_enabled:boolean}>('sorting-capabilities')})
   const shutdown = useAction()
   const [exited,setExited] = useState(false)
   const location=useLocation()
@@ -415,7 +435,7 @@ function App() {
   const requiresOrg=(children:React.ReactNode)=>org ? children : <section className="panel"><h2>품목을 등록하세요</h2>
     <p>프로그램 설정에서 품목을 등록하면 업무 자료를 관리할 수 있습니다.</p><NavLink to="/settings">프로그램 설정</NavLink></section>
   if (exited) return <main className="content"><p role="status">프로그램이 종료되었습니다. 이 탭을 닫아 주세요.</p></main>
-  return <div className="layout"><aside><div className="brand"><div><b>공동정산 수출실적</b><small>통합조직 업무시스템</small></div></div>
+  return <WorkflowProvider key={org?.id??0} org={org?.id??0}><div className="layout"><aside><div className="sidebar-content"><div className="brand"><div><b>공동정산 수출실적</b><small>통합조직 업무시스템</small></div></div>
     <WorkMenu/>
     <footer><button className="exit-button danger" type="button" disabled={shutdown.busy} onClick={()=>{
       if (!window.confirm('프로그램을 종료하시겠습니까? 저장하지 않은 변경사항은 사라집니다.')) return
@@ -425,22 +445,28 @@ function App() {
         return ''
       })
     }}>{shutdown.busy?'종료 중…':'프로그램 종료'}</button>
-    {shutdown.status&&!shutdown.busy&&<p role="alert">{shutdown.status}</p>}</footer></aside>
+    {shutdown.status&&!shutdown.busy&&<p role="alert">{shutdown.status}</p>}</footer></div></aside>
     <main><header><div>공동정산 수출실적 관리</div><span>품목 : <strong>{org?.name??'설정 필요'}</strong></span></header>
       <div className="content">{(office.isError||fields.isError) && <p role="alert">서버 연결을 확인하세요.</p>}
-      <Routes>{menus.map(([path,label])=><Route key={path} path={path} element={<>
+      {org&&sorting.data?.feature_enabled&&<WorkflowBar org={org.id}/>}<WorkflowRoute>{referenceDescriptions[location.pathname]&&<p className="panel reference-guidance">{referenceDescriptions[location.pathname]}</p>}<Routes>{menus.map(([path,label])=><Route key={path} path={path} element={<>
         <div className="page-title"><h1>{label}</h1></div>
         {path==='/'&&office.isSuccess&&!org?<Navigate to="/settings" replace/> :
           path==='/settings'?office.isSuccess&&<Settings org={org} choices={office.data.choices} refresh={refresh}/> : path==='/help'?<Help/> :
-          requiresOrg(org && (path==='/'?<Dashboard org={org}/> : path==='/members'||path==='/lines' ?
+          requiresOrg(org && (path==='/'?(sorting.data?.feature_enabled?<WorkbenchHome org={org}/>:<Dashboard org={org}/>) : path==='/members'||path==='/lines' ?
           (fields.data && <Suspense fallback={<p role="status">원장을 불러오는 중…</p>}>
             <LedgerGrid key={org.id+path} org={org.id} kind={path==='/members'?'members':'lines'}
               fields={fields.data[path==='/members'?'members':'lines']}/>
           </Suspense>) :
           path==='/submission'?<SubmissionWorkspace key={org.id} org={org} fields={fields.data}/> :
           <RunWorkspace key={org.id+path+location.search} org={org} mode={path.slice(1)} fields={fields.data}/>))}
-      </>}/>)}</Routes></div>
-    </main></div>
+      </>}/>)}{sorting.data?.feature_enabled&&<Route path="/sorting" element={requiresOrg(org&&<Suspense fallback={<p role="status">검토 화면을 불러오는 중…</p>}><SortingWorkspace key={org.id} org={org}/></Suspense>)}/>}{sorting.data?.feature_enabled&&<Route path="/facilities" element={<>
+        <div className="page-title"><h1>공동선별장 명부</h1></div>
+        {requiresOrg(org&&<Suspense fallback={<p role="status">시설 명부를 불러오는 중…</p>}><FacilityRegistry key={org.id} org={org}/></Suspense>)}
+      </>}/>} {sorting.data?.feature_enabled&&<Route path="/sorting-records" element={requiresOrg(org&&<Suspense fallback={<p role="status">접수 자료를 불러오는 중…</p>}><SortingIntakeWorkspace key={org.id} org={org}/></Suspense>)}/>}{sorting.data?.feature_enabled&&<Route path="/support-budgets" element={requiresOrg(org&&<Suspense fallback={<p role="status">지원기준을 불러오는 중…</p>}><SupportBudgetWorkspace key={org.id} org={org}/></Suspense>)}/>}{sorting.data?.feature_enabled&&<Route path="/monthly-reports" element={requiresOrg(org&&<Suspense fallback={<p role="status">월별 보고를 불러오는 중…</p>}><MonthlyReportWorkspace key={org.id} org={org}/></Suspense>)}/>}<Route path="/contracts" element={<>
+        <div className="page-title"><h1>계약서 등록</h1></div>
+        {requiresOrg(org&&<Suspense fallback={<p role="status">계약 화면을 불러오는 중…</p>}><ContractsWorkspace key={org.id} org={org}/></Suspense>)}
+      </>}/><Route path="/settlement-work" element={requiresOrg(org&&<><h1>공동선별비 정산·제출</h1><WorkbenchHome org={org} monthly/></>)}/><Route path="/reference" element={<Navigate to="/settings" replace/>}/><Route path="/archives" element={requiresOrg(org&&<><h1>제출자료 보관함</h1><ArchiveWorkspace org={org.id}/></>)}/></Routes></WorkflowRoute></div>
+    </main></div></WorkflowProvider>
 }
 
 createRoot(document.getElementById('root')!).render(

@@ -63,6 +63,7 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
   const [params,setParams] = useSearchParams()
   const problemOnly = params.get('filter') === 'issues'
   const rowChecks = checks.data ?? emptyChecks
+  const contractBlocked=kind==='lines'&&Object.values(rowChecks).some(items=>items.some(p=>p.code==='D090'||p.code==='D092'))
   const rows = query.data ?? emptyRows
   const members = useQuery({queryKey:[`org/${org}/data/members`], queryFn:() => get<Row[]>(`org/${org}/data/members`), enabled:kind==='lines'})
   const [selected, setSelected] = useState<Row>()
@@ -70,6 +71,7 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
   const [showPdf, setShowPdf] = useState(false)
   const [issues, setIssues] = useState<Problem[]>([])
   const [search, setSearch] = useState('')
+  const [period,setPeriod]=useState('all'),[dateFrom,setDateFrom]=useState(''),[dateTo,setDateTo]=useState('')
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
   const [hidden, setHidden] = useState<string[]>(() => kind==='lines' ? Object.keys(displayFields).filter(key=>!defaultLineFields.includes(key)) : [])
@@ -85,8 +87,12 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
   const dirty = selected && Object.keys(fields).some(key => String(selected[key] ?? '') !== String(draft[key] ?? ''))
   const selectedPdf = selected && draft.pdf
   const comparingPdf = showPdf ? selectedPdf : undefined
-  const visibleRows = useMemo(() => problemOnly ? rows.filter(row=>rowChecks[String(row.id)]?.some(p=>p.severity!=='INFO')) : rows,
-    [rows, problemOnly, rowChecks])
+  const visibleRows = useMemo(() => rows.filter(row=>{
+    if(problemOnly&&!rowChecks[String(row.id)]?.some(p=>p.severity!=='INFO'))return false
+    if(kind!=='lines'||period==='all')return true
+    const day=String(row.shipped||row.declared||'')
+    return !!day&&(!dateFrom||day>=dateFrom)&&(!dateTo||day<=dateTo)
+  }),[rows,problemOnly,rowChecks,kind,period,dateFrom,dateTo])
   useEffect(() => {
     if (!dirty) return
     const protect = (event: BeforeUnloadEvent) => event.preventDefault()
@@ -232,7 +238,11 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
     await reload()
   }
   return <section className="ledger-workspace">
+    {kind==='lines'&&<section className="panel registration-notice"><b>전체 기간 등록·관리</b><p>정산월과 무관하게 여러 달의 자료를 등록할 수 있습니다. 자료는 원문 날짜로 저장되며 공동선별비 계산 시 사용할 자료를 선택합니다. 조회 기간은 목록만 변경합니다.</p></section>}
+    {contractBlocked&&<div className="panel" role="alert">계약 관계가 확인되지 않은 신고가 있어 최종 확정이 차단됩니다. 제조자와 수출화주 또는 수출대행사 중 한 업체와의 유효한 계약을 확인하세요. <NavLink to="/contracts">계약서 등록 확인</NavLink></div>}
     <div className="toolbar ledger-tools">
+      {kind==='lines'&&<><label>조회 기간<select aria-label="조회 기간" value={period} onChange={e=>setPeriod(e.target.value)}><option value="all">전체 기간</option><option value="range">기간 지정</option></select></label>{period==='range'&&<><label>조회 시작일<input type="date" value={dateFrom} onChange={e=>setDateFrom(e.target.value)}/></label><label>조회 종료일<input type="date" value={dateTo} onChange={e=>setDateTo(e.target.value)}/></label><span>선적일 기준 · 없으면 신고일</span>{dateFrom&&dateTo&&dateFrom>dateTo&&<span role="alert">조회 종료일은 시작일 이후로 지정하세요.</span>}</>}</>}
+
       <label>자료 검색<input type="search" placeholder={kind==='lines'?'신고번호 또는 업체명':'업체명 또는 사업자번호'} value={search} onChange={e => setSearch(e.target.value)}/></label>
       {kind==='lines' && <button aria-pressed={problemOnly} onClick={()=>setParams(problemOnly?{}:{filter:'issues'})}>보완 필요만</button>}
       <div className="toolbar-spacer"/>
@@ -284,7 +294,7 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
     {selected && <form ref={form} className="ledger-editor" onSubmit={e => {e.preventDefault(); void action(save)}}>
       <div className="section-top">
         <div className="ledger-editor-title">
-          <h2>{draft.id ? `행 수정 · ${draft.id}` : '새 행 입력'}</h2>
+          <h2>{kind==='members'?(draft.id?'회원사 정보 수정':'회원사 추가'):(draft.id?`행 수정 · ${draft.id}`:'새 행 입력')}</h2>
           {selectedPdf && <small>신고번호 {String(draft.number || '미입력')} · 품목란 {String(draft.line || '미입력')} · 원본 {selectedPdf.page}쪽</small>}
           {selectedPdf && <button type="button" ref={pdfButton} aria-expanded={!!comparingPdf}
             aria-controls={comparingPdf ? 'ledger-pdf-preview' : undefined}
@@ -308,6 +318,7 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
                 {fields[problem.field]} · {problem.message}
               </button>
               {existingRowButton(problem)}
+              {(problem.code==='D090'||problem.code==='D092')&&<NavLink to="/contracts">계약서 등록 확인</NavLink>}
             </li>)}
         </ul>}
       </div>}
@@ -415,6 +426,7 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
       </fieldset>
       </div><div className="toolbar editor-actions">
         <button type="submit" className="primary" disabled={busy}>저장</button>
+        {kind==='members'&&selected.id&&<NavLink className="button" to={`/contracts?member=${selected.id}`}>관련 계약·연결 회원사 조회</NavLink>}
         {kind==='members' && selected.id && <button type="button" className="danger" disabled={busy} onClick={() => {
           if (!window.confirm(`‘${selected.name}’ 회원사를 명부에서 삭제하시겠습니까?`)) return
           void action(async () => {

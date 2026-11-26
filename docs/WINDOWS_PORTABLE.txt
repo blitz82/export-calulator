@@ -18,3 +18,5 @@ Windows 10에서는 첫 실행에 WebView2 폴더에만 앱 컨테이너의 읽�
 시작 오류 로그는 %LOCALAPPDATA%\EPMS\startup.log에서 확인할 수 있습니다.
 
 시작 CMD는 Windows PowerShell에 실행 정책이 지정되지 않았을 때 이번 실행에만 RemoteSigned를 적용하고 EPMS.exe를 엽니다.
+
+2.0.0: 공동선별비 기능은 기본 활성화됩니다. 전용 창이 열리지 않으면 Start-EPMS-Offline-Browser.cmd를 실행하세요. PC 기본 브라우저에서 동일한 data\epms.db로 열리며 외부 인터넷 서버가 필요하지 않습니다.

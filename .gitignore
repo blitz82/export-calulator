@@ -15,3 +15,10 @@ test-results/
 *.spec
 !EPMS.spec
 /samples/**/*.pdf
+/sample2/
+/output/sorting-private/
+/output/sorting-tests/
+/output/
+/오프라인실행-*/
+/samples/*
+!/samples/2027-공식양식.xlsx

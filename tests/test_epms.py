@@ -165,6 +165,15 @@ def client_for(path):
     return client, app
 
 
+def register_fixture_contract(client):
+    """The duplicate/OCR/export regressions assume a confirmed member agreement."""
+    from test_ocr import searchable_pdf
+    document=client.post('/api/org/1/contracts/documents/upload?name=fixture-contract.pdf',content=searchable_pdf()).raise_for_status().json()
+    client.post('/api/org/1/contracts',json=dict(title='합성 회원사 계약',kind='공급·수출 계약',
+        producer_id=3,exporter_id=2,document_id=document['id'],signed='2024-01-01',start='2024-01-01',end='2027-12-31',
+        evidence_pages={'parties':1},review='확인 완료',reason='회귀검증용 계약')).raise_for_status()
+
+
 @pytest.mark.parametrize("method", ["manual", "excel"])
 def test_registration_checks_active_declaration_lines(tmp_path, method):
     client, app = client_for(tmp_path / "registration.db")
@@ -183,6 +192,7 @@ def test_registration_checks_active_declaration_lines(tmp_path, method):
     try:
         client.post("/api/organizations", params={"name": "가상 신고"}).raise_for_status()
         client.post(base + "/data/members", json=[edit(member) for member in MEMBERS]).raise_for_status()
+        register_fixture_contract(client)
         if method == "manual":
             results = client.post(path, json=[edit(row) for row in rows]).raise_for_status().json()
             assert all(r.get("row") for r in results)
@@ -399,6 +409,7 @@ def test_ocr_approval_checks_active_declaration_lines(tmp_path):
         client.post(base + "/data/members", json=[
             {"values": {k: v for k, v in member.items() if k != "id"}} for member in MEMBERS
         ]).raise_for_status()
+        register_fixture_contract(client)
         client.post(path, json=[{"values": values}, {"values": values | {"line": "2", "status": "취소"}}]).raise_for_status()
         with app.state.db.begin() as conn:
             file_id = conn.execute(store.import_files.insert().values(
@@ -575,6 +586,7 @@ def test_workflow_and_restore(tmp_path):
         assert result["row"]
     result = client.post(base+"/data/members", json=[editable(MEMBERS[0])]).json()[0]
     assert [item["code"] for item in result["issues"]] == ["M005"]
+    register_fixture_contract(client)
     source = books.workbook([("합성", books.LINE, [line("ABA")])])
     url = base+"/import/lines"
     assert client.post(url, params={"name":"합성.xlsx"}, content=source).json()["imported"] == 1
