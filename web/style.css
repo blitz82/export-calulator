@@ -595,3 +595,44 @@ svg [role=button]:not([aria-disabled=true]):active { filter:brightness(.9); }
 @media(max-width:600px){.novice-progress{padding:12px}.novice-progress ol{grid-template-columns:1fr}.novice-record-form .form-grid{grid-template-columns:1fr}.novice-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.novice-sticky{position:static}.novice-record-summary{padding:12px}}
 .novice-mobile-switch{display:none}.sorting-intake>.page-title{gap:16px;align-items:flex-start}.sorting-intake>.page-title>button,.novice-progress .section-top>button{flex-shrink:0;white-space:nowrap}.novice-progress .section-top{gap:14px}
 @media(max-width:1050px){.novice-mobile-switch{display:flex;gap:10px;margin:12px 0}.novice-mobile-switch [aria-pressed=true]{background:#205c43;color:white}.sorting-intake .intake-two-pane[data-mobile-view=input] .intake-pdf{display:none}.sorting-intake .intake-two-pane[data-mobile-view=pdf] .intake-main{display:none}}
+
+/* Workflow safeguards and optional-field layouts; original control sizes restored. */
+:root {color:#24362e}
+.content :is(small,.muted,.contract-block,.board-detail-card p,.board-detail-card small,.board-controls label,.board-candidate-note,.board-dock-amount span,.board-dock-amount small,.budget-result small) {color:#465d50;line-height:1.6}
+.content .field-error,.content [role=alert] {color:#9b2536;font-size:12px}
+.content button:disabled {opacity:.65;cursor:not-allowed}
+.content .issue-list li>button {height:auto;overflow:visible;white-space:normal}
+.content .editor-scroll {scroll-padding-block:18px}
+.content .settlement-form {gap:20px}
+.facility-form {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;border:0;padding:0;min-width:0}
+.facility-form label {display:flex;flex-direction:column;gap:7px;min-width:0}
+.facility-form :is(input,select,textarea) {width:100%;min-width:0}
+.facility-form .full {grid-column:1/-1}
+.facility-form details label {margin-top:12px}
+.unsaved-dialog {width:min(520px,calc(100vw - 40px));box-sizing:border-box;padding:24px;border:1px solid #b3c9bc;border-radius:14px;color:#24362e;font-size:12px}
+.unsaved-dialog::backdrop {background:#142c2470}
+.unsaved-dialog h2 {font-size:14px}
+.unsaved-dialog button {font-size:12px;min-height:44px}
+.content .board-calculation-dock {position:sticky;bottom:0;left:auto;right:auto;margin-top:20px;font-size:12px;background:#fff;box-shadow:0 -3px 12px #173d2e18}
+.content .board-workspace-grid {padding-bottom:0}
+.content .board-overview span,.content .board-eyebrow,.content .board-live,.content .board-detail-card>span {color:#465d50}
+.board-node .board-card-meta {fill:#405561}
+.content .report-save,.content .budget-save {position:static;margin-top:24px}
+.contract-optional {grid-column:1/-1;padding:14px;border:1px solid #cbdcd2;border-radius:10px}
+.contract-optional .optional-grid {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin-top:16px}
+.contract-optional label {display:flex;flex-direction:column;gap:8px}
+.member-optional-fields {grid-column:1/-1;padding:14px;border:1px solid #cbdcd2;border-radius:10px}
+.form-instructions {padding:12px 16px;background:#eef5f1;border-radius:8px}
+@media(max-width:1400px){.ledger-split:has(.ledger-editor){flex-direction:column;height:auto}.ledger-split:has(.ledger-editor) .grid-shell{flex:none;height:320px}.ledger-editor{flex:auto;width:100%}.ledger-editor .editor-scroll{overflow:visible}.ledger-editor .entry{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:850px){.facility-form,.contract-optional .optional-grid,.ledger-editor .entry{grid-template-columns:minmax(0,1fr)}.content .board-calculation-dock{position:static}.content .board-controls{grid-template-columns:repeat(2,minmax(0,1fr))}.content .board-overview{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:580px){.content .board-controls{grid-template-columns:minmax(0,1fr)}.content .workflow-steps a{font-size:14px}.content .toolbar{gap:12px}.content .board-inspector[data-active=true]{top:12px;bottom:12px}}
+
+.numeric-input-control{display:flex;flex-direction:column;gap:5px;min-width:0;width:100%}.numeric-input-control>input{width:100%}.required-mark{font-size:14px;color:#7d2031;margin-left:6px}.setup-checklist li{margin:12px 0}.form-instructions{grid-column:1/-1}.content .matching-item .field-error{margin:4px 0}
+
+.contract-editor:not(:has(.contract-pdf)){grid-template-columns:minmax(0,1fr)}
+.contract-editor>div:empty{display:none}
+.contract-form-fields fieldset label{display:grid;gap:8px;min-width:0}
+.contract-form-fields :is(input:not([type=checkbox]),select){width:100%;min-width:0;box-sizing:border-box}
+.contract-form-fields>fieldset{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.contract-form-fields>fieldset>p,.contract-form-fields>fieldset>details,.contract-form-fields>fieldset>fieldset{grid-column:1/-1}
+@media(max-width:700px){.contract-form-fields>fieldset{grid-template-columns:minmax(0,1fr)}}

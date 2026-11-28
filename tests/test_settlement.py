@@ -22,7 +22,7 @@ def env(tmp_path,monkeypatch):
     path='/api/org/1/settlements';old='/api/org/1/sorting'
     doc=c.post(path+'/documents/upload?name=선별증빙.pdf&kind=선별일지',content=searchable_pdf()).raise_for_status().json()['id']
     facility=c.post(old+'/facilities',json=dict(name='공동선별장',product='사과',member_number=members[0]['number'],designation='테스트지정',valid_from='2025-01-01',valid_to='2027-12-31',evidence_id=doc)).raise_for_status().json()['id']
-    c.post('/api/org/1/contracts',json=dict(title='수출 계약',kind='공급',producer_id=1,exporter_id=2,document_id=c.post('/api/org/1/contracts/documents/upload?name=계약.pdf',content=searchable_pdf()).json()['id'],signed='2025-01-01',start='2025-01-01',end='2027-12-31',reason='합성 검증')).raise_for_status()
+    c.post('/api/org/1/contracts',json=dict(title='수출 계약',kind='공급',review='확인 완료',evidence_pages={'parties':1},producer_id=1,exporter_id=2,document_id=c.post('/api/org/1/contracts/documents/upload?name=계약.pdf',content=searchable_pdf()).json()['id'],signed='2025-01-01',start='2025-01-01',end='2027-12-31',reason='합성 검증')).raise_for_status()
     yield c,app,path,doc,facility,members,tmp_path
     c.close();app.state.db.dispose()
 

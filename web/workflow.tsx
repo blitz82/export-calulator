@@ -7,20 +7,42 @@ import {localToday} from './contracts-model'
 import type {ReportRow} from './monthly-report-model'
 
 export function monthDates(month:string){const [year,m]=month.split('-').map(Number);return {year,start:month+'-01',end:new Date(Date.UTC(year,m,0)).toISOString().slice(0,10)}}
-type Context={month:string;year:number;start:string;end:string;setMonth:(v:string)=>void;markDirty:(key:string,dirty:boolean)=>void}
+type SaveDraft=()=>Promise<boolean|void>
+type Context={month:string;year:number;start:string;end:string;setMonth:(v:string)=>void;markDirty:(key:string,dirty:boolean,save?:SaveDraft)=>void;requestLeave:(next:()=>void,save?:SaveDraft)=>void}
 const current=localToday().slice(0,7)
-const WorkflowContext=createContext<Context>({month:current,...monthDates(current),setMonth:()=>{},markDirty:()=>{}})
+const WorkflowContext=createContext<Context>({month:current,...monthDates(current),setMonth:()=>{},markDirty:()=>{},requestLeave:next=>next()})
 export const useWorkflow=()=>useContext(WorkflowContext)
-export function useWorkflowDirty(key:string,dirty:boolean){const {markDirty}=useWorkflow();useEffect(()=>{markDirty(key,dirty);return()=>markDirty(key,false)},[markDirty,key,dirty])}
+export function useWorkflowDirty(key:string,dirty:boolean,save?:SaveDraft){
+  const {markDirty}=useWorkflow(),latest=useRef(save);latest.current=save
+  useEffect(()=>{markDirty(key,dirty,save?()=>latest.current!():undefined);return()=>markDirty(key,false)},[markDirty,key,dirty,!!save])
+}
 export function WorkflowProvider({org,children}:{org:number;children:ReactNode}){
   const storage=`epms-work-month-${org}`
   const [month,change]=useState(()=>{try{const v=localStorage.getItem(storage);return v&&/^\d{4}-(0[1-9]|1[0-2])$/.test(v)&&Number(v.slice(0,4))>=1900?v:current}catch{return current}})
-  const dirty=useRef(new Set<string>())
-  const markDirty=useCallback((key:string,value:boolean)=>{if(value)dirty.current.add(key);else dirty.current.delete(key)},[])
-  const setMonth=useCallback((v:string)=>{if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(v)||Number(v.slice(0,4))<1900)return;if(dirty.current.size&&!window.confirm('저장하지 않은 입력이 있습니다. 저장 전 변경을 버리고 업무 월을 바꿀까요?'))return;dirty.current.clear();try{localStorage.setItem(storage,v)}catch{}change(v)},[storage])
-  const value=useMemo(()=>({month,...monthDates(month),setMonth,markDirty}),[month,setMonth,markDirty])
-  useEffect(()=>{const warn=(e:BeforeUnloadEvent)=>{if(dirty.current.size){e.preventDefault();e.returnValue=''}};window.addEventListener('beforeunload',warn);return()=>window.removeEventListener('beforeunload',warn)},[])
-  return <WorkflowContext.Provider value={value}><div className="workflow-shell" onClickCapture={e=>{const link=(e.target as HTMLElement).closest('a');if(link?.getAttribute('href')?.startsWith('#/')&&link.getAttribute('href')?.split('?')[0]!==location.hash.split('?')[0]&&dirty.current.size){if(!window.confirm('저장하지 않은 입력을 버리고 이동할까요?')){e.preventDefault();e.stopPropagation()}else dirty.current.clear()}}}>{children}</div></WorkflowContext.Provider>
+  const dirty=useRef(new Map<string,SaveDraft|undefined>()),dialog=useRef<HTMLDialogElement>(null)
+  const [pending,setPending]=useState<{next:()=>void;save?:SaveDraft}|null>(null),[saving,setSaving]=useState(false),[error,setError]=useState('')
+  const markDirty=useCallback((key:string,value:boolean,save?:SaveDraft)=>{if(value)dirty.current.set(key,save);else dirty.current.delete(key)},[])
+  const requestLeave=useCallback((next:()=>void,save?:SaveDraft)=>{
+    if(!dirty.current.size){next();return}
+    const saves=[...dirty.current.values()]
+    setError('');setPending({next,save:save??(saves.every(Boolean)?async()=>{for(const task of saves)if(await task!()===false)return false;return true}:undefined)})
+  },[])
+  const setMonth=useCallback((v:string)=>{if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(v)||Number(v.slice(0,4))<1900)return;requestLeave(()=>{try{localStorage.setItem(storage,v)}catch{}change(v)})},[storage,requestLeave])
+  const value=useMemo(()=>({month,...monthDates(month),setMonth,markDirty,requestLeave}),[month,setMonth,markDirty,requestLeave])
+  useEffect(()=>{if(pending&&!dialog.current?.open)dialog.current?.showModal();if(!pending&&dialog.current?.open)dialog.current.close()},[pending])
+  useEffect(()=>{
+    const warn=(e:BeforeUnloadEvent)=>{if(dirty.current.size){e.preventDefault();e.returnValue=''}}
+    window.addEventListener('beforeunload',warn)
+    const navigation=(window as unknown as {navigation?:EventTarget}).navigation
+    const navigate=(event:Event)=>{const e=event as Event&{destination?:{url:string};navigationType?:string};if(e.navigationType!=='traverse'||!e.destination||!e.cancelable||!dirty.current.size)return;const next=new URL(e.destination.url);if(next.origin===location.origin&&next.pathname===location.pathname&&next.hash!==location.hash){e.preventDefault();requestLeave(()=>{location.hash=next.hash})}}
+    navigation?.addEventListener('navigate',navigate)
+    return()=>{window.removeEventListener('beforeunload',warn);navigation?.removeEventListener('navigate',navigate)}
+  },[requestLeave])
+  function proceed(){const next=pending?.next;dirty.current.clear();setPending(null);next?.()}
+  return <WorkflowContext.Provider value={value}><div className="workflow-shell" onClickCapture={e=>{
+    const link=(e.target as HTMLElement).closest('a'),href=link?.getAttribute('href')
+    if(href?.startsWith('#/')&&href!==location.hash&&dirty.current.size){e.preventDefault();e.stopPropagation();requestLeave(()=>{location.hash=href.slice(1)})}
+  }}>{children}</div><dialog ref={dialog} className="unsaved-dialog" aria-labelledby="unsaved-title" onCancel={e=>{e.preventDefault();if(!saving)setPending(null)}}><h2 id="unsaved-title">저장하지 않은 입력이 있습니다</h2><p>이동하기 전에 입력을 저장하거나 계속 작성할 수 있습니다.</p>{error&&<p role="alert">{error}</p>}{!pending?.save&&<p>입력 중인 행이나 증빙은 현재 화면에서 먼저 저장해 주세요.</p>}<div className="toolbar"><button autoFocus disabled={saving} onClick={()=>setPending(null)}>계속 작성</button><button className="primary" disabled={saving||!pending?.save} onClick={async()=>{if(!pending?.save)return;setSaving(true);setError('');try{if(await pending.save()===false){setError('저장하지 못했습니다. 계속 작성을 눌러 표시된 입력값을 보완하세요.');return}proceed()}catch(e){setError((e as Error).message)}finally{setSaving(false)}}}>{saving?'저장 중…':'저장하고 이동'}</button><button className="danger" disabled={saving} onClick={proceed}>버리고 이동</button></div></dialog></WorkflowContext.Provider>
 }
 export type OfficePreferences={revision:number|null;data:{writer:string;destination:string;mapping:Record<string,number>;mapping_headers?:string[]}}
 type Overview={month:string;start:string;end:string;receipts:{id:number;state:string;data:{title:string};issues:string[]}[];jobs:{id:number;state:string;data:{title:string;lines:unknown[]}}[];reports:ReportRow[];plan:{revision:number;title:string;enabled:boolean;status:string}|null;preferences:OfficePreferences;facilities:{id:number;name:string}[]}
@@ -28,12 +50,21 @@ const steps=[['자료 접수','/sorting-records'],['수출신고필증 등록','
 function useOverview(org:number){const {month}=useWorkflow();return useQuery({queryKey:[`org/${org}/workspace`,month],queryFn:()=>get<Overview>(`org/${org}/workspace?month=${month}`),staleTime:0,refetchOnWindowFocus:true})}
 export function WorkflowBar({org}:{org:number}){
   const w=useWorkflow(),location=useLocation()
+  const selectedJob=new URLSearchParams(location.search).get('job'),selectedReport=new URLSearchParams(location.search).get('report')
+  const stepPath=(path:string)=>path.startsWith('/sorting')&&selectedJob?path+(path.includes('?')?'&':'?')+'job='+selectedJob:path.startsWith('/monthly-reports')&&selectedReport?path+(path.includes('?')?'&':'?')+'report='+selectedReport:path
   if(!['/settlement-work','/sorting','/monthly-reports'].includes(location.pathname))return null
-  return <section className="workflow-bar" aria-label="현재 업무 월과 단계"><div className="workflow-month"><label>공동선별비 정산월<input aria-label="공동선별비 정산월" type="month" value={w.month} onChange={e=>w.setMonth(e.target.value)}/></label><span>정산·보고할 월입니다. 자료의 선별일·신고일·선적일·실제 지급일은 원문대로 유지합니다.</span><NavLink to="/settlement-work">정산 진행 현황</NavLink></div><ol className="workflow-steps">{steps.map(([name,path],i)=><li key={name}><NavLink to={path} aria-current={location.pathname===path.split('?')[0]&&(location.pathname!=='/sorting'||(path.includes('stage=calculate')===location.search.includes('stage=calculate')))?'step':undefined}><span>{i+1}</span>{name}</NavLink></li>)}</ol></section>
+  return <section className="workflow-bar" aria-label="현재 업무 월과 단계"><div className="workflow-month"><label>공동선별비 정산월<input aria-label="공동선별비 정산월" type="month" value={w.month} onChange={e=>w.setMonth(e.target.value)}/></label><span>정산·보고할 월입니다. 자료의 선별일·신고일·선적일·실제 지급일은 원문대로 유지합니다.</span><NavLink to="/settlement-work">정산 진행 현황</NavLink></div><ol className="workflow-steps">{steps.map(([name,path],i)=><li key={name}><NavLink to={stepPath(path)} aria-current={location.pathname===path.split('?')[0]&&(location.pathname!=='/sorting'||(path.includes('stage=calculate')===location.search.includes('stage=calculate')))?'step':undefined}><span>{i+1}</span>{name}</NavLink></li>)}</ol></section>
 }
 export function WorkflowRoute({children}:{children:ReactNode}){const {month}=useWorkflow();const {pathname}=useLocation();return <div key={['/settlement-work','/sorting','/monthly-reports'].includes(pathname)?month:'all-periods'} className="workflow-route">{children}</div>}
-export function WorkspaceIntro(){
-  return <div className="workbench-home"><p>자료는 수시로 등록하고, 공동선별비는 정산월별로, 수출실적은 실적연도별로 처리합니다.</p><div className="workbench-task-grid"><section className="panel"><h2>자료 등록하기</h2><p>여러 달의 자료를 한꺼번에 등록할 수 있습니다. 원문 날짜를 기준으로 보관합니다.</p><NavLink className="button primary" to="/lines">수출신고필증 등록</NavLink><NavLink className="button" to="/sorting-records">선별기록·증빙 등록</NavLink></section><NavLink className="panel workbench-task" to="/settlement-work"><h2>공동선별비 정산·제출</h2><p>정산월 선택 → 물량 연결 → 지원액 계산 → 실제 지급내역 → 제출자료</p></NavLink><NavLink className="panel workbench-task" to="/submission"><h2>회원사별 수출실적 계산</h2><p>실적연도로 직접·간접 실적을 계산합니다. 공동선별비 연결 여부와 별도로 관리합니다.</p></NavLink></div></div>
+export function WorkspaceIntro({org}:{org:number}){
+  const work=useWorkflow(),prefix=`org/${org}`
+  const members=useQuery({queryKey:[prefix+'/data/members'],queryFn:()=>get<unknown[]>(prefix+'/data/members')})
+  const facilities=useQuery({queryKey:[prefix+'/sorting','facilities'],queryFn:()=>get<unknown[]>(prefix+'/sorting/facilities')})
+  const contracts=useQuery({queryKey:[prefix+'/contracts','setup'],queryFn:()=>get<{data:{review:string}}[]>(prefix+'/contracts')})
+  const budget=useQuery({queryKey:[prefix+'/support-budgets',work.year,'setup'],queryFn:()=>get<{plan:{data:{enabled:boolean}}|null}>(prefix+'/support-budgets/'+work.year)})
+  const ready=[!!members.data?.length,contracts.data?.some(c=>c.data.review==='확인 완료'),!!facilities.data?.length,!!budget.data?.plan?.data.enabled]
+
+  return <div className="workbench-home"><details className="panel setup-checklist" open={!members.data?.length||!facilities.data?.length}><summary>처음 한 번: 기준정보 확인</summary><p>담당자가 바뀌어도 다시 입력할 필요는 없습니다. 이미 등록된 정보를 확인하고 재사용하세요.</p><ol>{[['/members','회원사 명부'],['/contracts','원문 확인이 끝난 계약'],['/facilities','공동선별장'],['/support-budgets?year='+work.year,work.year+'년 지원기준·배정']].map(([path,label],i)=><li key={path}><NavLink to={path}>{label}</NavLink> · {ready[i]?'등록·확인됨':'확인 필요'}</li>)}</ol>{[members,facilities,contracts,budget].some(q=>q.isError)&&<p role="alert">기준정보를 불러오지 못했습니다. 각 메뉴에서 다시 확인하세요.</p>}<p>이 체크리스트는 등록 여부 안내입니다. 실제 거래 날짜의 계약·회원 자격과 지원기준은 최종 확정 시 다시 검증합니다.</p></details><p>자료는 수시로 등록하고, 공동선별비는 정산월별로, 수출실적은 실적연도별로 처리합니다.</p><div className="workbench-task-grid"><section className="panel"><h2>자료 등록하기</h2><p>여러 달의 자료를 한꺼번에 등록할 수 있습니다. 원문 날짜를 기준으로 보관합니다.</p><NavLink className="button primary" to="/lines">수출신고필증 등록</NavLink><NavLink className="button" to="/sorting-records">선별기록·증빙 등록</NavLink></section><NavLink className="panel workbench-task" to="/settlement-work"><h2>공동선별비 정산·제출</h2><p>정산월 선택 → 물량 연결 → 지원액 계산 → 실제 지급내역 → 제출자료</p></NavLink><NavLink className="panel workbench-task" to="/submission"><h2>회원사별 수출실적 계산</h2><p>실적연도로 직접·간접 실적을 계산합니다. 공동선별비 연결 여부와 별도로 관리합니다.</p></NavLink></div></div>
 }
 
 export function WorkbenchHome({org}:{org:{id:number;name:string}}){
@@ -49,3 +80,4 @@ export function WorkbenchHome({org}:{org:{id:number;name:string}}){
   </div>
 }
 export function ArchiveWorkspace({org}:{org:number}){const rows=useQuery({queryKey:[`org/${org}/monthly-reports`],queryFn:()=>get<ReportRow[]>(`org/${org}/monthly-reports`)}),[message,setMessage]=useState('');return <><section className="panel"><h2>회원사별 수출실적 Excel</h2><p>기존 연간 인정·직전 연도 비교 규칙을 유지합니다.</p><NavLink to="/submission">연도별 검토·보관본 열기</NavLink></section><section className="panel"><h2>월별 공동선별비 제출본</h2>{rows.isError&&<p role="alert">{rows.error.message}</p>}{rows.data?.filter(r=>r.state!=='DRAFT').slice().reverse().map(r=><div className="archive-row" key={r.id}><NavLink to={`/monthly-reports?report=${r.id}`}>{r.data.year}년 {r.data.month}월 · {r.data.title}</NavLink><span>{r.state==='SUBMITTED'?'제출 기록 있음':r.state==='SUPERSEDED'?'정정 전 보존본':r.state==='UNLOCKED'?'정정 필요':'제출본 보존'}</span><button onClick={()=>void download(`org/${org}/monthly-reports/${r.id}/pdf`).catch(e=>setMessage(e.message))}>통합 PDF</button><button onClick={()=>void download(`org/${org}/monthly-reports/${r.id}/pdf?originals=true`).catch(e=>setMessage(e.message))}>원본 ZIP</button></div>)}{rows.isSuccess&&!rows.data?.some(r=>r.state!=='DRAFT')&&<p>보존된 제출본이 없습니다. 공동선별비 정산·제출에서 자료를 완성하세요.</p>}<p role="status">{message}</p></section></>}
+

@@ -58,7 +58,7 @@ Copy-Item -LiteralPath "docs/SUPPORT_BUDGET_WORKFLOW.md" -Destination $packageDi
 Copy-Item -LiteralPath "docs/MONTHLY_REPORT_WORKFLOW.md" -Destination $packageDir
 Copy-Item -LiteralPath "docs/MONTHLY_WORKFLOW_GUIDE.md" -Destination $packageDir
 Copy-Item -LiteralPath "docs/OPEN_SOURCE_COMPLIANCE.md" -Destination "$distPath/$appName/오픈소스 검토 안내.md"
-Copy-Item -LiteralPath "docs/RELEASE_2_0_2.md" -Destination "$packageDir/RELEASE_NOTES.md"
+Copy-Item -LiteralPath "docs/RELEASE_2_0_4.md" -Destination "$packageDir/RELEASE_NOTES.md"
 & $Python -m epms.packaging_checks $variant --webview $WebViewRuntime --output (Join-Path $packageDir "build-info.json")
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 & $Python -m epms.oss_inventory "$distPath/$appName" $variant --analysis (Join-Path $OutputRoot "work/$variant/EPMS/Analysis-00.toc")

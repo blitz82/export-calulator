@@ -1,3 +1,4 @@
+import {NumberInput} from './number-input'
 import {useEffect,useState,useRef} from 'react'
 import {useQuery} from '@tanstack/react-query'
 import {NavLink,useSearchParams} from 'react-router-dom'
@@ -18,7 +19,7 @@ import type {BudgetOverview} from './support-budget-model'
 export function SettlementWorkspace({org}:{org:{id:number;name:string}}){
   const work=useWorkflow()
   const path=`org/${org.id}/settlements`
-  const [params]=useSearchParams()
+  const [params,setParams]=useSearchParams()
   const jobs=useQuery({queryKey:[path],queryFn:()=>get<Job[]>(path)})
   const [active,setActive]=useState<Job>(),[tab,setTab]=useState('물량 연결·계산')
   const catalog=useQuery({queryKey:[path,'catalog',active?.id],queryFn:()=>get<Catalog>(`${path}/catalog${active?'?job_id='+active.id:''}`),enabled:!params.get('job')||!!active})
@@ -28,8 +29,9 @@ export function SettlementWorkspace({org}:{org:{id:number;name:string}}){
   const [draft,setDraft]=useState<Payload>(empty),[dirty,setDirty]=useState(false),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[result,setResult]=useState<Result>(),[previewing,setPreviewing]=useState(false),[edge,setEdge]=useState<number>(),[pdf,setPdf]=useState<Ref>(),[snapshot,setSnapshot]=useState<Snapshot>()
   const [recordDirty,setRecordDirty]=useState(false)
   const [detailSelection,setDetailSelection]=useState<{side:'left'|'right';id:number}>(),[undoLines,setUndoLines]=useState<Edge[]>(),[policyOpen,setPolicyOpen]=useState(false),[costOpen,setCostOpen]=useState(false)
-  useWorkflowDirty('settlement',dirty||recordDirty)
+  useWorkflowDirty('settlement',dirty||recordDirty,recordDirty?undefined:()=>save())
   const openedJob=useRef('')
+  useEffect(()=>{if(params.get('stage')==='calculate'&&active){setPolicyOpen(true);setTab('물량 연결·계산');requestAnimationFrame(()=>document.getElementById('settlement-calculation')?.scrollIntoView({block:'start'}))}},[params,active?.id])
   useEffect(()=>{const key=params.get('job');if(key&&openedJob.current!==key&&jobs.data){const job=jobs.data.find(j=>j.id===Number(key));if(job){openedJob.current=key;open(job)}}},[params,jobs.data])
   const facility=active?.data.facility_id??draft.facility_id
   const budgetPath=`org/${org.id}/support-budgets/${draft.year}`
@@ -46,10 +48,10 @@ export function SettlementWorkspace({org}:{org:{id:number;name:string}}){
   },[path,active?.id,draft,catalog.data,budget.data?.plan?.revision])
   const update=<K extends keyof Payload>(key:K,value:Payload[K])=>{setDraft(prev=>({...prev,[key]:value,request_key:crypto.randomUUID()}));setDirty(true);setResult(undefined);setSnapshot(undefined)}
   const policy=<K extends keyof Policy>(key:K,value:Policy[K])=>update('policy',{...draft.policy,[key]:value})
-  function open(job?:Job){if((dirty||recordDirty)&&!window.confirm('저장하지 않은 정산 입력을 버리시겠습니까?'))return;setActive(job);setDraft(job?{...job.data,revision:job.revision,request_key:crypto.randomUUID()}:empty());setDirty(false);setRecordDirty(false);setPdf(undefined);setResult(undefined);setSnapshot(undefined);setEdge(undefined);setDetailSelection(undefined);setUndoLines(undefined);setMessage('')}
+  function open(job?:Job){if((dirty||recordDirty)&&!window.confirm('저장하지 않은 정산 입력을 버리시겠습니까?'))return;setParams(job?{job:String(job.id),...(params.get('stage')?{stage:params.get('stage')!}:{})}:{});setActive(job);setDraft(job?{...job.data,revision:job.revision,request_key:crypto.randomUUID()}:empty());setDirty(false);setRecordDirty(false);setPdf(undefined);setResult(undefined);setSnapshot(undefined);setEdge(undefined);setDetailSelection(undefined);setUndoLines(undefined);setMessage('')}
   async function refresh(){await Promise.all([catalog.refetch(),jobs.refetch(),...(active?[history.refetch()]:[])])}
   async function action(task:()=>Promise<void>){setBusy(true);setMessage('처리 중…');try{await task()}catch(e){setMessage((e as Error).message)}finally{setBusy(false)}}
-  async function save(){const row=await send<Job>(`${path}${active?'/'+active.id:''}`,draft,active?'PUT':'POST');setActive(row);setDraft({...row.data,revision:row.revision,request_key:crypto.randomUUID()});setDirty(false);await jobs.refetch();setMessage('초안을 저장했습니다. 아직 새 물량을 예약하지 않았습니다. 기존 확정 연결이 있으면 수정 확정 전까지 유지됩니다.')}
+  async function save(){const row=await send<Job>(`${path}${active?'/'+active.id:''}`,draft,active?'PUT':'POST');setParams({job:String(row.id),...(params.get('stage')?{stage:params.get('stage')!}:{})});setActive(row);setDraft({...row.data,revision:row.revision,request_key:crypto.randomUUID()});setDirty(false);await jobs.refetch();setMessage('초안을 저장했습니다. 아직 새 물량을 예약하지 않았습니다. 기존 확정 연결이 있으면 수정 확정 전까지 유지됩니다.')}
   const editEdge=(key:keyof Edge,value:Edge[keyof Edge])=>{if(edge===undefined)return;update('lines',draft.lines.map((e,i)=>i===edge?{...e,[key]:value}:e))}
   const changeLines=(lines:Edge[])=>{setUndoLines(draft.lines);update('lines',lines)}
   const removeEdge=(index:number)=>{changeLines(draft.lines.filter((_,n)=>n!==index));setEdge(undefined);setDetailSelection(undefined);setMessage('연결을 해제했습니다. 직전 연결 변경 취소로 되돌릴 수 있습니다.')}
@@ -68,7 +70,7 @@ export function SettlementWorkspace({org}:{org:{id:number;name:string}}){
         <label>정산 제목<input required value={draft.title} onChange={e=>update('title',e.target.value)}/></label>
         <label>사업연도<input type="number" min="1900" max="9999" required value={draft.year} onChange={e=>update('year',Number(e.target.value))}/></label>
         <label>공동선별장<select aria-label="정산 공동선별장" required disabled={!!active} value={facility||''} onChange={e=>update('facility_id',Number(e.target.value))}><option value="">선별장 선택</option>{catalog.data?.facilities.map(f=><option key={f.id} value={f.id}>{f.data.name}</option>)}</select></label>
-        <p className="full">정산월과 연결 대상 자료의 기간은 별개입니다. 아래 기간으로 자료를 조회하며, 월을 넘는 연결은 기존 검증과 사유 확인을 적용합니다.</p><label>대상 시작일<input type="date" required value={draft.start} onChange={e=>update('start',e.target.value)}/></label><label>대상 종료일<input type="date" required value={draft.end} onChange={e=>update('end',e.target.value)}/></label>
+        <p className="full">정산월과 연결 대상 자료의 기간은 별개입니다. 아래 기간으로 자료를 조회하며, 다음 달·다음 해 신고도 연결할 수 있습니다. 선적일은 선별일 이후여야 합니다.</p><label>대상 시작일<input type="date" required value={draft.start} onChange={e=>update('start',e.target.value)}/></label><label>대상 종료일<input type="date" required value={draft.end} onChange={e=>update('end',e.target.value)}/></label>
         <button className="primary" disabled={busy||!facility||!catalog.data?.facilities.some(f=>f.id===facility)}>{active?'초안 저장':'작업 생성'}</button>
       </form></details>
       {!catalog.data?.facilities.length&&catalog.isSuccess&&<p><NavLink to="/facilities">공동선별장 명부</NavLink>에서 선별장을 먼저 등록하세요.</p>}
@@ -96,10 +98,10 @@ export function SettlementWorkspace({org}:{org:{id:number;name:string}}){
             {c.method.includes('비율')?<><label>수출분 분자<input value={c.numerator} onChange={e=>edit('numerator',e.target.value)}/></label><label>전체 분모<input value={c.denominator} onChange={e=>edit('denominator',e.target.value)}/></label></>:<label>배부액 원<input value={c.amount} onChange={e=>edit('amount',e.target.value)}/></label>}
             <label>배부 근거·사유<input value={c.reason} onChange={e=>edit('reason',e.target.value)}/></label><button type="button" onClick={()=>update('costs',draft.costs.filter((_,n)=>n!==i))}>비용 배부 해제</button><button type="button" onClick={()=>{const row=catalog.data!.expenses.find(v=>v.id===c.expense_id);if(row)edit('revision',row.data.revision)}}>비용 원문 재대조</button></div></fieldset>})}
         </section>
-        {managed?.data.formula==='실비 한도'&&<section className="panel budget-member-costs"><h2>생산자회원사별 확인 실비 배부</h2><p>이번 작업에 배부한 지급 비용을 회원사별로 나누세요. 배부 비용 합계와 일치해야 하며 같은 실비를 여러 회원사에 중복 적용하지 않습니다.</p>{[...new Map(draft.lines.flatMap(e=>{const producer=catalog.data!.batches.find(b=>b.id===e.batch_id)?.data.producer;return producer?[[producer.id,producer] as const]:[]})).values()].map(m=><label key={m.id}>{m.name} 확인 실비 (원)<input aria-label={`${m.name} 확인 실비`} inputMode="numeric" value={draft.member_costs?.find(a=>a.member_id===m.id)?.amount??''} onChange={e=>update('member_costs',[...(draft.member_costs??[]).filter(a=>a.member_id!==m.id),...(e.target.value!==''?[{member_id:m.id,amount:e.target.value}]:[])])}/></label>)}</section>}
+        {managed?.data.formula==='실비 한도'&&<section className="panel budget-member-costs"><h2>생산자회원사별 확인 실비 배부</h2><p>이번 작업에 배부한 지급 비용을 회원사별로 나누세요. 배부 비용 합계와 일치해야 하며 같은 실비를 여러 회원사에 중복 적용하지 않습니다.</p>{[...new Map(draft.lines.flatMap(e=>{const producer=catalog.data!.batches.find(b=>b.id===e.batch_id)?.data.producer;return producer?[[producer.id,producer] as const]:[]})).values()].map(m=><label key={m.id}>{m.name} 확인 실비 (원)<NumberInput aria-label={`${m.name} 확인 실비`} inputMode="numeric" value={draft.member_costs?.find(a=>a.member_id===m.id)?.amount??''} onChange={e=>update('member_costs',[...(draft.member_costs??[]).filter(a=>a.member_id!==m.id),...(e.target.value!==''?[{member_id:m.id,amount:e.target.value}]:[])])}/></label>)}</section>}
         <section className="panel board-policy-settings" hidden={!policyOpen}><h2>참고 계산 기준</h2><p>공식 단가·보조율·허용 차이가 미정이므로 가정값을 직접 입력합니다. 기준이 없는 값은 0원으로 추정하지 않습니다.</p><div className="settlement-form">
           <label>산식<select disabled={!!managed} value={managed?.data.formula??draft.policy.formula} onChange={e=>policy('formula',e.target.value)}><option>물량 단가</option><option>실비 한도</option></select></label><label>계산 기준 이름<input disabled={!!managed} value={managed?.data.title??draft.policy.label} onChange={e=>policy('label',e.target.value)}/></label>
-          {([['unit_price','kg당 단가 (원)'],['rate','보조율 (%)'],['cap','이번 작업 금액 한도 (선택)'],['cap_quantity','이번 작업 물량 한도 kg (선택)'],['scope_cap','동일 선별장·사업연도 누적 한도 원 (선택)'],['deduction','다른 지원 등 차감액 원'],['tolerance_kg','허용 절대 차이 kg (선택)'],['tolerance_percent','허용 차이율 % (신고 측 배분량 기준, 선택)']] as const).map(([k,label])=><label key={k}>{label}<input inputMode="decimal" value={managed&&['unit_price','rate','tolerance_kg','tolerance_percent'].includes(k)?String(managed.data[k as 'unit_price'|'rate'|'tolerance_kg'|'tolerance_percent']):draft.policy[k]} disabled={!!managed&&['unit_price','rate','tolerance_kg','tolerance_percent'].includes(k)||k==='rate'&&draft.policy.rate_included} onChange={e=>policy(k,e.target.value)}/></label>)}
+          {([['unit_price','kg당 단가 (원)'],['rate','보조율 (%)'],['cap','이번 작업 금액 한도 (선택)'],['cap_quantity','이번 작업 물량 한도 kg (선택)'],['scope_cap','동일 선별장·사업연도 누적 한도 원 (선택)'],['deduction','다른 지원 등 차감액 원'],['tolerance_kg','허용 절대 차이 kg (선택)'],['tolerance_percent','허용 차이율 % (신고 측 배분량 기준, 선택)']] as const).map(([k,label])=><label key={k}>{label}<NumberInput inputMode="decimal" value={managed&&['unit_price','rate','tolerance_kg','tolerance_percent'].includes(k)?String(managed.data[k as 'unit_price'|'rate'|'tolerance_kg'|'tolerance_percent']):draft.policy[k]} disabled={!!managed&&['unit_price','rate','tolerance_kg','tolerance_percent'].includes(k)||k==='rate'&&draft.policy.rate_included} onChange={e=>policy(k,e.target.value)}/></label>)}
           <label>차이 기준 결합<select disabled={!!managed} value={managed?.data.tolerance_rule??draft.policy.tolerance_rule} onChange={e=>policy('tolerance_rule',e.target.value)}><option>둘 다</option><option>하나 이상</option></select></label><label>금액 처리<select disabled={!!managed} value={managed?.data.rounding??draft.policy.rounding} onChange={e=>policy('rounding',e.target.value)}><option>원 미만 절사</option><option>원 단위 반올림</option></select></label>
           <label className="full check"><input type="checkbox" disabled={!!managed} checked={managed?.data.rate_included??draft.policy.rate_included} onChange={e=>policy('rate_included',e.target.checked)}/> 입력 단가에 보조율이 이미 포함됨 (보조율을 다시 곱하지 않음)</label>
           <label className="full">계산 근거·가정<textarea disabled={!!managed} value={managed?.data.reference??draft.policy.reference} onChange={e=>policy('reference',e.target.value)}/></label>
@@ -107,7 +109,7 @@ export function SettlementWorkspace({org}:{org:{id:number;name:string}}){
         </div></section>
       </>}
       {(tab==='물량 연결·계산'||tab==='정산 결과')&&shownResult?.support&&<SupportResultPanel result={shownResult.support}/>}
-      {(tab==='물량 연결·계산'||tab==='정산 결과')&&<section className="panel settlement-summary"><h2>{snapshot?'보존된 정산 결과':'현재 연결·계산 결과'}</h2>
+      {(tab==='물량 연결·계산'||tab==='정산 결과')&&<section id="settlement-calculation" tabIndex={-1} className="panel settlement-summary"><h2>{snapshot?'보존된 정산 결과':'현재 연결·계산 결과'}</h2>
         {previewing&&!snapshot&&<p role="status">연결·잔량·계산 기준 검증 중…</p>}
         {shownResult&&<><div className="settlement-metrics"><p>선별 연결 <b>{shownResult.left} kg</b></p><p>신고 연결 <b>{shownResult.right} kg</b></p><p>차이 <b>{shownResult.difference} kg</b></p><p>적용 물량 <b>{shownResult.billable} kg</b></p><p>배부 비용 <b>{shownResult.allocated_cost}원</b></p><p>지원 예상액 <strong>{shownResult.amount===null?'기준 보완 필요':shownResult.amount+'원'}</strong></p></div>
           <p>{shownResult.label}</p><p>{shownResult.formula}</p><p>{shownResult.quantity_basis}</p>

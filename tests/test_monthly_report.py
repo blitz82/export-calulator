@@ -87,7 +87,7 @@ def test_shared_document_multi_member_legacy_attribution(env):
     # A second producer is allowed to supply the same exporter under its own contract.
     from test_ocr import searchable_pdf
     contract=c.post('/api/org/1/contracts/documents/upload?name=다른생산자.pdf',content=searchable_pdf()).raise_for_status().json()['id']
-    c.post('/api/org/1/contracts',json=dict(title='다른 생산자 계약',kind='공급',producer_id=3,exporter_id=2,document_id=contract,signed='2025-01-01',start='2025-01-01',end='2027-12-31',reason='격리 검증')).raise_for_status()
+    c.post('/api/org/1/contracts',json=dict(title='다른 생산자 계약',kind='공급',review='확인 완료',evidence_pages={'parties':1},producer_id=3,exporter_id=2,document_id=contract,signed='2025-01-01',start='2025-01-01',end='2027-12-31',reason='격리 검증')).raise_for_status()
     other=(*env[:5],[env[5][2],env[5][1],env[5][0]],env[6]);b,_=source(other,'500','별개 생산자 작업',producer_id=3);d=declaration(other,'500','002')
     # Release and reconfirm one mixed-producer calculation, never altering an operating DB.
     c.post(env[2]+f"/{job['id']}/release",json=dict(revision=snap['revision'],reason='혼합 생산자 검증')).raise_for_status()

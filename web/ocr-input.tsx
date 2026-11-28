@@ -1,3 +1,4 @@
+import {NumberInput} from './number-input'
 import { useEffect, useRef, useState } from 'react'
 import type { PointerEvent } from 'react'
 import { request } from './api'
@@ -376,7 +377,7 @@ export function OcrInput({org, fields, members, disabled, onSaved}: {
             aria-invalid={!!problems.length} aria-describedby={problems.length ? id + '-issues' : undefined}>
             <option value="">{key.endsWith('_state') ? '회원 명부 대조' : '선택'}</option>
             {choices[key].map(option=><option key={option}>{option}</option>)}
-          </select> : <input id={id} aria-label={label} value={value}
+          </select> : ['usd','kg','fob','quantity'].includes(key)?<NumberInput id={id} aria-label={label} value={value} aria-invalid={!!problems.length} aria-describedby={problems.length?id+'-issues':undefined} onChange={e=>updateField(key,e.target.value)}/>:<input id={id} aria-label={label} value={value}
             aria-invalid={!!problems.length} aria-describedby={problems.length ? id + '-issues' : undefined}
             onChange={e=>updateField(key,e.target.value)} onBlur={key==='line' ? e=>{
               const formatted = formatLineNumber(e.currentTarget.value)

@@ -1,3 +1,4 @@
+import {suggestSingleAllocation} from './monthly-report-model'
 import {describe,it,expect} from 'vitest'
 import {newReport,selectedMembers} from './monthly-report-model'
 import type {ReportCatalog} from './monthly-report-model'
@@ -8,4 +9,11 @@ describe('월별 보고 범위',()=>{
     const catalog:ReportCatalog={files:[],settlements:[{snapshot_id:1,job_id:1,title:'일별',year:2026,start:'',end:'',amount:'1000',members:[{member_id:1,name:'같은명칭',number:'1',amount:'1000',kg:'100'}]},{snapshot_id:2,job_id:2,title:'다른날',year:2026,start:'',end:'',amount:'200',members:[{member_id:2,name:'같은명칭',number:'2',amount:'200',kg:'10'}]}]}
     expect(selectedMembers(draft,catalog).map(m=>[m.member_id,m.amount,m.kg])).toEqual([[1,'300','20'],[2,'200','10']])
   })
+})
+
+it('suggests full allocation only for a single member and preserves intentional overrides',()=>{
+ expect(suggestSingleAllocation([{member_id:1}],[],'','5000')).toEqual([{member_id:1,amount:'5000'}])
+ expect(suggestSingleAllocation([{member_id:1}],[{member_id:1,amount:'5000'}],'5000','6000')).toEqual([{member_id:1,amount:'6000'}])
+ expect(suggestSingleAllocation([{member_id:1}],[{member_id:1,amount:'3000'}],'5000','6000')).toEqual([{member_id:1,amount:'3000'}])
+ expect(suggestSingleAllocation([{member_id:1},{member_id:2}],[],'','5000')).toEqual([])
 })

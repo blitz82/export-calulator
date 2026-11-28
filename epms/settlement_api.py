@@ -1,3 +1,4 @@
+from epms.downloads import attachment
 from contextlib import closing
 from hashlib import sha256
 import re
@@ -48,7 +49,8 @@ def install(app,db,organization,actor):
                 if row.get('source'):
                     source=conn.execute(select(store.import_rows.c.file,store.import_rows.c.row,store.import_files.c.name,store.import_files.c.kind).join(store.import_files,store.import_files.c.id==store.import_rows.c.file).where(store.import_rows.c.id==row['source'])).first()
                     if source and source.kind=='pdf':pdf=dict(file=source.file,name=source.name,page=source.row)
-                declarations.append(dict(row,available=s.text_quantity(available),errors=errors,pdf=pdf))
+                dates={field:(day.isoformat() if (day:=rules.day(row.get(field))) else '') for field in ('shipped','declared')}
+                declarations.append(dict(row,**dates,available=s.text_quantity(available),errors=errors,pdf=pdf))
             for row in s.list_rows(conn,s.expenses,org):
                 d=row['data']
                 if d.get('settlement'):expenses.append(dict(row,available=str(max(st.Decimal(0),st.paid(d)-st.number(d['excluded'])-st.used_cost(conn,row['id'],job_id))),issues=st.expense_issues(d),affected_jobs=intake.affected(conn,org,'cost',row['id'])))
@@ -116,7 +118,7 @@ def install(app,db,organization,actor):
     def pdf(org:int,key:int):
         with db.connect() as conn:
             gate(conn,org);row=s.scoped(conn,st.snapshots,org,key)
-        return Response(row['pdf'],media_type='application/pdf',headers={'Content-Disposition':f'attachment; filename="settlement-{row["revision"]}.pdf"'})
+        return Response(row['pdf'],media_type='application/pdf',headers={'Content-Disposition':attachment(f"{row['data']['data']['start'][:7]}_{row['data'].get('organization','통합조직')}_공동선별비_정산결과_{row['data'].get('confirmation_number',row['revision'])}차.pdf",f"settlement-{row['revision']}.pdf")})
 
     @app.post(prefix+'/sources')
     def source(org:int,value:st.Source,request:Request):

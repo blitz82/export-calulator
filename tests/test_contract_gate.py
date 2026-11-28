@@ -1,7 +1,10 @@
 """Confirmation is gated by at least one manufacturer/exporter agreement."""
 import pytest
 from epms import contract_gate, rules
-from test_member_contracts import env, payload, create
+from test_member_contracts import env, payload as contract_payload, create
+
+def payload(document, **changes):
+    return contract_payload(document, **({'review':'확인 완료'} | changes))
 
 
 def declaration(c, **changes):
@@ -113,3 +116,55 @@ def test_excluded_cancelled_and_missing_date(env):
     create(c,payload(doc))
     with app.state.db.connect() as conn:
         assert contract_gate.evaluate(declaration(c,shipped=''),members,contract_gate.context(conn,1))[0]==[]
+
+
+def test_bulk_unresolved_manufacturer_explicitly_blocks_contract_gate(env):
+    c,app,doc,_=env
+    values=declaration(c,maker_name='원문 이름 미대조')
+    response=c.post('/api/org/1/data/lines',json=[dict(values=values),dict(values=dict(values,line='002'))]).raise_for_status().json()
+    for saved in response:
+        assert any(p['code']=='D091' for p in saved['issues'])
+        checks=c.get('/api/org/1/line-checks').json()[str(saved['row']['id'])]
+        assert any(p['code']=='D091' for p in checks)
+    _,ids=setup_runs(c,dict(values,line='003'))
+    assert not c.get(f'/api/org/1/runs/{ids[1]}').json()['ready']
+
+
+def test_excel_import_unresolved_relation_retains_row_and_explicit_blocker(env):
+    from io import BytesIO
+    from openpyxl import Workbook
+    from epms import books
+    c,app,doc,_=env
+    values=declaration(c,maker_name='미대조 제조자')
+    workbook=Workbook();sheet=workbook.active;sheet.title='수출신고필증'
+    sheet.append(list(books.LINE.values()));sheet.append([values.get(k,'') for k in books.LINE])
+    stream=BytesIO();workbook.save(stream)
+    result=c.post('/api/org/1/import/lines?name=synthetic.xlsx',content=stream.getvalue()).raise_for_status().json()
+    assert result['imported']==1 and result['needs_review']==1
+    checks=c.get('/api/org/1/line-checks').json()
+    assert any(p['code']=='D091' for items in checks.values() for p in items)
+
+
+@pytest.mark.parametrize('review',['미검토','확인 필요','확인 완료'])
+def test_period_validity_does_not_replace_manual_contract_review(env,review):
+    c,app,doc,_=env
+    agreement=create(c,payload(doc,review=review))
+    saved,ids=setup_runs(c,declaration(c))
+    issues=saved['issues']
+    assert any(p['code']=='D090' for p in issues)==(review!='확인 완료')
+    assert c.get(f'/api/org/1/runs/{ids[1]}').json()['ready']==(review=='확인 완료')
+    if review!='확인 완료':
+        params=dict(previous_id=ids[0],run_id=ids[1],final=True)
+        assert c.post('/api/org/1/annual-submission',params=params).status_code==400
+        fixed=payload(doc,review='확인 완료',revision=agreement['revision'])
+        c.put(f"/api/org/1/contracts/{agreement['id']}",json=fixed).raise_for_status()
+        checks=c.get('/api/org/1/line-checks').json()
+        assert not any(p['code']=='D090' for values in checks.values() for p in values)
+
+
+def test_reverting_contract_review_blocks_previously_ready_confirmation(env):
+    c,app,doc,_=env
+    contract=create(c,payload(doc));_,ids=setup_runs(c,declaration(c))
+    c.put(f"/api/org/1/contracts/{contract['id']}",json=payload(doc,review='확인 필요',revision=1)).raise_for_status()
+    response=c.post('/api/org/1/annual-submission',params=dict(previous_id=ids[0],run_id=ids[1],final=True))
+    assert response.status_code==400 and '확인 완료' in response.json()['detail']

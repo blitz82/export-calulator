@@ -1,3 +1,4 @@
+import {downloadFilename} from './download-filename'
 import {validationMessage} from './validation-message'
 const token = fetch('/api/session').then(async response => {
   if (!response.ok) throw new Error('프로그램 연결을 확인하세요.')
@@ -28,9 +29,9 @@ export async function download(path: string, method = 'GET') {
   const response = await request(path, {method})
   const url = URL.createObjectURL(await response.blob())
   const anchor = document.createElement('a')
-  const name = response.headers.get('Content-Disposition')?.split("UTF-8''")[1]
+  const name = downloadFilename(response.headers.get('Content-Disposition'))
   anchor.href = url
-  anchor.download = name ? decodeURIComponent(name) : '공동정산 수출실적 관리'
+  anchor.download = name ?? '공동정산 수출실적 관리'
   anchor.click()
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 }

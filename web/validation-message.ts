@@ -1,4 +1,4 @@
-const labels:Record<string,string>={reviews:'회원사 내부검토',payments:'실제 지급',resolutions:'지출결의',declaration_evidence:'수출신고필증 원본',evidence:'근거 증빙',documents:'첨부 자료',allocations:'회원사 배분',file:'원본 PDF',page:'근거 페이지',member_id:'회원사',amount:'금액',decision:'내부결정액',date:'일자',start:'시작일',end:'종료일',title:'제목',writer:'작성자',destination:'제출처',reason:'변경·정정 사유',unit_price:'지원단가'}
+const labels:Record<string,string>={facility_id:'공동선별장',valid_from:'지정 시작일',valid_to:'지정 종료일',producer_id:'생산자회원사',exporter_id:'수출업체',document_id:'계약 PDF',review:'원문 검토 상태',export_quantity:'수출용 선별량',period_type:'기록 구분',received:'접수일',member_number:'운영 회원사',designation:'지정번호',reviews:'회원사 내부검토',payments:'실제 지급',resolutions:'지출결의',declaration_evidence:'수출신고필증 원본',evidence:'근거 증빙',documents:'첨부 자료',allocations:'회원사 배분',file:'원본 PDF',page:'근거 페이지',member_id:'회원사',amount:'금액',decision:'내부결정액',date:'일자',start:'시작일',end:'종료일',title:'제목',writer:'작성자',destination:'제출처',reason:'변경·정정 사유',unit_price:'지원단가'}
 export function validationMessage(detail:unknown){
   if(typeof detail==='string')return detail
   if(!Array.isArray(detail))return '요청을 완료하지 못했습니다.'

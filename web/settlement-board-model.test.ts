@@ -24,7 +24,7 @@ describe('board candidates and balances',()=>{
   it('matches business identity, never name alone',()=>{expect(sameProducer(b,d)).toBe(true);expect(sameProducer(b,{...d,maker:'',maker_name:'동명회사'})).toBe(false)})
   it('requires identity, period, balance and validation for recommendations',()=>{
     expect(candidateInfo(b,d,900n,'2026-11-01','2026-11-30').recommended).toBe(true)
-    for(const item of [{...d,errors:['계약 확인']},{...d,shipped:'2026-12-01'},{...d,maker:'9999999999'}])expect(candidateInfo(b,item,900n,'2026-11-01','2026-11-30').recommended).toBe(false)
+    for(const item of [{...d,errors:['계약 확인']},{...d,shipped:'2026-11-01'},{...d,shipped:'',declared:'2026-11-05'},{...d,maker:'9999999999'}])expect(candidateInfo(b,item,900n,'2026-11-01','2026-11-30').recommended).toBe(false)
     expect(candidateInfo(b,d,0n,'','').recommended).toBe(false)
   })
   it('counts every edge on shared records',()=>{
@@ -37,4 +37,10 @@ describe('board candidates and balances',()=>{
     const balance=boardBalances(bs,[d],[{batch_id:1,declaration_id:1,left:'600',right:'600'}] as Edge[])
     expect(sourceWeightTotal(bs)).toBe(1_000_000_000n);expect(balance.left.get(2)).toBe(400_000_000n);expect(sourceWeightTotal(bs,balance)).toBe(400_000_000n)
   })
+})
+
+it('allows next month and next year shipping without a date exception',()=>{
+  expect(candidateInfo(b,{...d,shipped:'2026-12-01'},1n,'2026-11-01','2026-11-30').recommended).toBe(true)
+  expect(candidateInfo({...b,data:{...b.data,start:'2026-12-31'}},{...d,shipped:'2027-01-01'},1n,'2026-12-01','2026-12-31').recommended).toBe(true)
+  expect(candidateInfo(b,{...d,shipped:'2026-11-02'},1n,'','').recommended).toBe(true)
 })

@@ -1,4 +1,6 @@
-import {useEffect,useState} from 'react'
+import {useWorkflow,useWorkflowDirty} from './workflow'
+import {NumberInput} from './number-input'
+import {useEffect,useState,useRef} from 'react'
 import {useQuery,useQueryClient} from '@tanstack/react-query'
 import {useSearchParams} from 'react-router-dom'
 import {get,request,send} from './api'
@@ -34,7 +36,9 @@ export function ContractsWorkspace({org}:{org:{id:number;name:string}}){
   const [editing,setEditing]=useState<Agreement|null>(),[draft,setDraft]=useState<AgreementData>(emptyAgreement)
   const [reason,setReason]=useState('신규 계약 등록'),[message,setMessage]=useState(''),[busy,setBusy]=useState(false),[page,setPage]=useState(1)
   const [uploaded,setUploaded]=useState<ContractDocument>(),[historySnapshot,setHistorySnapshot]=useState<Agreement>()
-  const [dirty,setDirty]=useState(false)
+  const [dirty,setDirty]=useState(false),formRef=useRef<HTMLFormElement>(null)
+  const {requestLeave}=useWorkflow()
+  useWorkflowDirty('contract',dirty,saveContract)
   const doc=useQuery({queryKey:[path,'document',draft.document_id],queryFn:()=>get<ContractDocument>(`${path}/documents/${draft.document_id}`),enabled:!!draft.document_id})
   const history=useQuery({queryKey:[path,'history',editing?.id,editing?.revision],queryFn:()=>get<History[]>(`${path}/${editing!.id}/history`),enabled:!!editing?.id})
   const document=uploaded?.id===draft.document_id?uploaded:doc.data
@@ -44,9 +48,8 @@ export function ContractsWorkspace({org}:{org:{id:number;name:string}}){
     const warn=(e:BeforeUnloadEvent)=>{e.preventDefault();e.returnValue=''}
     window.addEventListener('beforeunload',warn);return ()=>window.removeEventListener('beforeunload',warn)
   },[dirty])
-  const canLeave=()=>!dirty||window.confirm('저장하지 않은 계약 입력을 버리시겠습니까?')
-  function open(row?:Agreement,amendment=false){
-    if(!canLeave())return
+  function open(row?:Agreement,amendment=false){requestLeave(()=>openNow(row,amendment))}
+  function openNow(row?:Agreement,amendment=false){
     setEditing(amendment||!row?null:row)
     const data=row?{...row.data,producer_id:row.producer_id,exporter_id:row.exporter_id,document_id:row.document_id,parent_id:row.parent_id}:emptyAgreement()
     data.product=org.name
@@ -54,11 +57,21 @@ export function ContractsWorkspace({org}:{org:{id:number;name:string}}){
     if(!row&&memberParam)data.producer_id=memberParam
     setDraft(data);setUploaded(undefined);setPage(1);setReason(amendment?'변경계약 등록':row?'':'신규 계약 등록');setMessage('');setDirty(false);setHistorySnapshot(undefined)
   }
-  function change<K extends keyof AgreementData>(key:K,value:AgreementData[K]){setDraft(prev=>({...prev,[key]:value}));setDirty(true)}
+  function change<K extends keyof AgreementData>(key:K,value:AgreementData[K]){setDraft(prev=>({...prev,[key]:value,...(!['review','evidence_pages','memo'].includes(key)&&prev.review==='확인 완료'?{review:'확인 필요'}:{})}));setDirty(true)}
   function setPeriod(type:AgreementData['period_type'],year:number){
     if(!Number.isInteger(year)||year<1900||year>9999)return
     const start=type==='연간 계약'?`${year}-01-01`:draft.signed.startsWith(year+'-')?draft.signed:localToday().startsWith(year+'-')?localToday():`${year}-01-01`
-    setDraft(prev=>({...prev,period_type:type,contract_year:year,start,end:`${year}-12-31`}));setDirty(true)
+    setDraft(prev=>({...prev,review:'확인 필요',period_type:type,contract_year:year,start,end:`${year}-12-31`}));setDirty(true)
+  }
+  async function saveContract(){
+    if(!formRef.current?.reportValidity())return false
+    if(!draft.document_id||!draft.producer_id||!draft.exporter_id)throw new Error('생산자회원사·수출업체와 계약 PDF를 선택하세요.')
+        const {producer:_producer,exporter:_exporter,...values}=draft
+        const saved=await send<Agreement>(`${path}${editing?'/'+editing.id:''}`,{...values,revision:editing?.revision??null,reason},editing?'PUT':'POST')
+        setEditing(saved);setDraft({...saved.data,producer_id:saved.producer_id,exporter_id:saved.exporter_id});setDirty(false);setReason('')
+        await qc.invalidateQueries({queryKey:[path]})
+        setMessage(`계약 #${saved.id} 저장 완료. ${[...(saved.warnings??[]),...saved.status_issues].join(' ')}${state&&saved.state!==state?' 현재 상태 필터에서는 숨겨집니다. 전체 상태를 선택해 확인하세요.':''}`)
+    return true
   }
   async function action(task:()=>Promise<void>){
     setBusy(true);setMessage('처리 중…')
@@ -95,18 +108,12 @@ export function ContractsWorkspace({org}:{org:{id:number;name:string}}){
     </section>}
     <p role="status" className="contract-message">{message}</p>
     {editing!==undefined&&<section className="contract-editor" aria-label="계약 입력과 PDF 대조">
-      <form className="panel" onSubmit={e=>{e.preventDefault();void action(async()=>{
-        const {producer:_producer,exporter:_exporter,...values}=draft
-        const saved=await send<Agreement>(`${path}${editing?'/'+editing.id:''}`,{...values,revision:editing?.revision??null,reason},editing?'PUT':'POST')
-        setEditing(saved);setDraft({...saved.data,producer_id:saved.producer_id,exporter_id:saved.exporter_id});setDirty(false);setReason('')
-        await qc.invalidateQueries({queryKey:[path]})
-        setMessage(`계약 #${saved.id} 저장 완료. ${[...(saved.warnings??[]),...saved.status_issues].join(' ')}${state&&saved.state!==state?' 현재 상태 필터에서는 숨겨집니다. 전체 상태를 선택해 확인하세요.':''}`)
-      })}}>
+      <form ref={formRef} className="panel" onSubmit={e=>{e.preventDefault();void action(async()=>{await saveContract()})}}>
         <h2>{editing?`계약 #${editing.id} · 수정 ${editing.revision}차`:'신규 계약'}{draft.parent_id?` · 원계약 #${draft.parent_id}의 변경계약`:''}</h2>
         <p>역할은 이 계약에 적용됩니다. 회원사 명부의 유형을 자동 변경하지 않습니다.</p>
         <fieldset disabled={busy} className="contract-form-fields">
-          <label>계약명<input required maxLength={200} value={draft.title} onChange={e=>change('title',e.target.value)}/></label>
-          <label>계약 유형<input required maxLength={100} value={draft.kind} onChange={e=>change('kind',e.target.value)} list="contract-types"/></label>
+          <label>계약명 (필수)<input aria-label="계약명" required maxLength={200} value={draft.title} onChange={e=>change('title',e.target.value)}/></label>
+          <label>계약 유형 (필수)<input aria-label="계약 유형" required maxLength={100} value={draft.kind} onChange={e=>change('kind',e.target.value)} list="contract-types"/></label>
           <datalist id="contract-types">{['공급·수출 계약','공동정산 약정','변경계약','기타'].map(s=><option key={s}>{s}</option>)}</datalist>
           <MemberPicker label="생산자회원사" members={members.data??[]} value={draft.producer_id} disabled={!!editing} snapshot={draft.producer} onChange={id=>change('producer_id',id)}/>
           <MemberPicker label="수출업체" members={members.data??[]} value={draft.exporter_id} disabled={!!editing} snapshot={draft.exporter} onChange={id=>change('exporter_id',id)}/>
@@ -116,16 +123,17 @@ export function ContractsWorkspace({org}:{org:{id:number;name:string}}){
           {(['signed','start','end','terminated'] as const).map((key,i)=><label key={key}>{['계약 체결일','계약 시작일','계약 종료일 (미정이면 공란)','해지일 (해당 시)'][i]}
             <input type="date" required={i<2} readOnly={draft.period_type==='연간 계약'&&(key==='start'||key==='end')} value={draft[key]} onChange={e=>{
               const value=e.target.value
-              setDraft(prev=>({...prev,[key]:value,...(key==='start'&&value?{contract_year:Number(value.slice(0,4))}:{}),...(key==='signed'&&prev.period_type==='기간 지정'&&value?{start:value,contract_year:Number(value.slice(0,4))}:{})}));setDirty(true)
+              setDraft(prev=>({...prev,[key]:value,review:'확인 필요',...(key==='start'&&value?{contract_year:Number(value.slice(0,4))}:{}),...(key==='signed'&&prev.period_type==='기간 지정'&&value?{start:value,contract_year:Number(value.slice(0,4))}:{})}));setDirty(true)
             }}/></label>)}
           <label><input type="checkbox" checked={draft.auto_renew} onChange={e=>change('auto_renew',e.target.checked)}/> 자동연장 조항 있음</label>
           <label>통합조직 품목<input readOnly value={org.name}/></label>
           <p>대상 HS코드 ({draft.contract_year}년 정책): {hsCodes.length?hsCodes.join(', '):'미등록'} · 단일 품목에 여러 HS코드를 등록할 수 있습니다. 프로그램 설정의 연도별 정책을 따릅니다.</p>
           {policies.isError&&<p role="alert">HS코드 정책 조회 실패 <button type="button" onClick={()=>void policies.refetch()}>다시 조회</button></p>}
-          {(['quantity','unit','amount','currency'] as const).map((key,i)=><label key={key}>{['약정 물량 (선택)','물량 단위','거래금액 (선택)','통화'][i]}
-            <input maxLength={i%2?20:40} value={draft[key]} onChange={e=>change(key,e.target.value)}/></label>)}
+          <details className="contract-optional"><summary>약정 물량·금액·조항·메모 (선택)</summary><div className="optional-grid">          {(['quantity','unit','amount','currency'] as const).map((key,i)=><label key={key}>{['약정 물량 (선택)','물량 단위','거래금액 (선택)','통화'][i]}
+            {key==='quantity'||key==='amount'?<NumberInput maxLength={40} value={draft[key]} onChange={e=>change(key,e.target.value)}/>:<input maxLength={20} value={draft[key]} onChange={e=>change(key,e.target.value)}/>}</label>)}
           {terms.map(([key,label])=><label key={key}>{label}<textarea rows={3} maxLength={4000} value={draft[key]} onChange={e=>change(key,e.target.value)}/></label>)}
-          <label>검토 상태<select value={draft.review} onChange={e=>change('review',e.target.value)}>{['미검토','확인 필요','확인 완료'].map(s=><option key={s}>{s}</option>)}</select></label>
+</div></details>
+          <p className="form-instructions">미검토 계약도 저장할 수 있습니다. 수출자료 최종 확정에는 유효기간과 원문 확인 완료 상태가 모두 필요합니다.</p><label>검토 상태<select value={draft.review} onChange={e=>change('review',e.target.value)}>{['미검토','확인 필요','확인 완료'].map(s=><option key={s}>{s}</option>)}</select></label>
           <fieldset><legend>계약 PDF 원본</legend><p>로컬 PDF 텍스트에서 후보를 제시합니다. 스캔본은 원문을 보고 수동 입력하세요. 후보는 자동 확정되지 않습니다.</p>
             {!editing&&<label>계약 PDF 업로드<input type="file" accept="application/pdf,.pdf" onChange={e=>{
               const file=e.target.files?.[0];if(!file)return
@@ -156,17 +164,17 @@ export function ContractsWorkspace({org}:{org:{id:number;name:string}}){
                   }}>입력 후보 확인</button></div>)}
                 {document.extraction.pages.map(p=><div key={p.page}><button type="button" onClick={()=>setPage(p.page)}>{p.page}쪽 보기</button>{p.warning&&<p>{p.warning}</p>}<pre className="contract-extracted">{p.text||'추출 텍스트 없음'}</pre></div>)}
               </details>
-              <fieldset><legend>원문 근거 페이지</legend>{Object.entries(evidenceLabels).map(([key,label])=><div className="toolbar" key={key}>
+              <p>계약 당사자와 기간을 PDF에서 확인한 뒤 확인 근거를 지정하세요.</p><button type="button" onClick={()=>change('evidence_pages',{...draft.evidence_pages,parties:page})}>현재 {page}쪽을 계약 확인 근거로 지정</button><p>{Object.keys(draft.evidence_pages).length?'확인 근거 지정됨':'확인 완료로 저장하려면 원문 근거를 1개 이상 지정하세요.'}</p><details><summary>항목별 근거 페이지 추가 (선택)</summary>              <fieldset><legend>원문 근거 페이지</legend>{Object.entries(evidenceLabels).map(([key,label])=><div className="toolbar" key={key}>
                 <label>{label} 근거 쪽<input type="number" min="1" max={document.pages} value={draft.evidence_pages[key]??''} onChange={e=>{
                   const value=Number(e.target.value),pages={...draft.evidence_pages};if(e.target.value)pages[key]=value;else delete pages[key];change('evidence_pages',pages)
                 }}/></label><button type="button" onClick={()=>change('evidence_pages',{...draft.evidence_pages,[key]:page})}>현재 {page}쪽 지정</button>
                 {draft.evidence_pages[key]&&<button type="button" onClick={()=>setPage(draft.evidence_pages[key])}>근거 이동</button>}
-              </div>)}</fieldset>
+              </div>)}</fieldset></details>
             </>}
           </fieldset>
           <label>{editing?'변경 사유':'등록 사유'}<input required maxLength={500} value={reason} onChange={e=>{setReason(e.target.value);setDirty(true)}}/></label>
-          <div className="toolbar"><button type="submit" className="primary" disabled={!draft.document_id||(!editing&&(!draft.producer_id||!draft.exporter_id))}>계약 저장</button>
-            <button type="button" onClick={()=>{if(canLeave()){setEditing(undefined);setDirty(false)}}}>입력 닫기</button>
+          <div className="toolbar"><button type="submit" className="primary" disabled={busy}>계약 저장</button>
+            <button type="button" onClick={()=>{requestLeave(()=>{setEditing(undefined);setDirty(false)})}}>입력 닫기</button>
             {editing&&<button type="button" onClick={()=>open(editing,true)}>변경계약으로 등록</button>}
           </div>
         </fieldset>

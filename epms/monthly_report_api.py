@@ -1,3 +1,4 @@
+from epms.downloads import attachment
 from fastapi import Request
 from fastapi.responses import Response
 from sqlalchemy import select
@@ -70,5 +71,7 @@ def install(app,db,gate,actor):
             gate(conn,org);s.scoped(conn,m.reports,org,key)
             p=conn.execute(m.packages.select().where(m.packages.c.report==key)).mappings().first()
             if not p:st.fail('제출본을 먼저 생성하세요.',404)
+            edition=len(m.family(conn,org,key))
         ext='zip' if originals else 'pdf'
-        return Response(p['archive'] if originals else p['pdf'],media_type='application/zip' if originals else 'application/pdf',headers={'Content-Disposition':f'attachment; filename="monthly-report-{key}.{ext}"'})
+        return Response(p['archive'] if originals else p['pdf'],media_type='application/zip' if originals else 'application/pdf',headers={'Content-Disposition':attachment(f"{p['data']['data']['year']}-{p['data']['data']['month']:02d}_{p['data'].get('organization','통합조직')}_공동선별비_제출본_{edition}차_보고{key}.{ext}",f'monthly-report-{key}.{ext}')})
+

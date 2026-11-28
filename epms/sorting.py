@@ -185,14 +185,16 @@ def capacity(conn,org,declaration_id,declaration_revision,batch_id,dispatch_id=N
 
 
 def validate_facility(conn, org, data, ignore_id=None):
-    for field in ('name', 'product', 'member_number', 'designation', 'valid_from', 'valid_to', 'evidence_id'):
+    for field in ('name', 'product', 'member_number', 'designation', 'valid_from', 'evidence_id'):
         if not data.get(field):
             reject('SORT_E01', field, '시설 필수정보와 지정증빙을 입력하세요.', 422)
     try:
-        start, end = date.fromisoformat(data['valid_from']), date.fromisoformat(data['valid_to'])
+        start = date.fromisoformat(data['valid_from'])
+        end = date.fromisoformat(data['valid_to']) if data.get('valid_to') else None
+        data['valid_to'] = end.isoformat() if end else None
     except (ValueError, TypeError):
         reject('SORT_E01', 'valid_from', '유효기간은 ISO 날짜여야 합니다.', 422)
-    if start > end:
+    if end and start > end:
         reject('SORT_E01', 'valid_to', '유효기간 순서를 확인하세요.', 422)
     scoped(conn, evidence, org, data['evidence_id'])
     if not conn.execute(select(store.memberships.c.id).where(store.memberships.c.org == org,
@@ -202,7 +204,7 @@ def validate_facility(conn, org, data, ignore_id=None):
         if row['id']==ignore_id:
             continue
         other = row['data']
-        if other['designation'] == data['designation'] and start.isoformat() <= other['valid_to'] and end.isoformat() >= other['valid_from']:
+        if other['designation'] == data['designation'] and (not other.get('valid_to') or start.isoformat() <= other['valid_to']) and (not end or end.isoformat() >= other['valid_from']):
             reject('SORT_E01', 'designation', '동일 지정번호의 유효기간이 겹칩니다.')
 def add_facility(conn, org, data, actor):
     validate_facility(conn,org,data)
@@ -349,7 +351,7 @@ def review(conn, org, entity_id):
         delta=None if current_weight is None or original_weight is None else str(current_weight-original_weight)
         work=rules.day(batch['data'].get('work_date'))
         dispatch=rules.day(batch['data'].get('dispatch_date'))
-        if work and not (facility['data']['valid_from']<=work.isoformat()<=facility['data']['valid_to']):
+        if work and not (facility['data']['valid_from']<=work.isoformat() and (not facility['data'].get('valid_to') or work.isoformat()<=facility['data']['valid_to'])):
             line_issues.append(problem('SORT_E01','work_date','작업일이 시설 지정기간 밖입니다. 자격 기준일 정책 검토 필요'))
         if work and dispatch and dispatch<work:
             line_issues.append(problem('SORT_W08','dispatch_date','출고일이 선별일보다 앞섭니다. 원본 날짜 의미를 확인하세요.','WARNING'))

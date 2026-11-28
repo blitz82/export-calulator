@@ -380,9 +380,11 @@ def _calculate(conn,org,data,key=None,strict=False):
         if source.get('total') is not None and number(source.get('total',''),True) is not None and Decimal(source['quantity'])>number(source['total']):error('수출물량이 총 투입물량보다 큽니다. 원본 입력을 수정하세요.')
         if source.get('warnings') and not source.get('overlap_reason'):error('선별물량 합계 차이에 대한 확인 사유를 입력하세요.')
         start=source.get('start',source.get('work_date',''));end=source.get('end',start)
-        ship=rules.day(original.get('shipped')) or rules.day(original.get('declared'))
-        if not (facility['data']['valid_from']<=start<=end<=facility['data']['valid_to']):error('시설 지정 유효기간과 선별기간을 확인하세요.')
-        if start<data['start'] or end>data['end'] or (ship and (ship.isoformat()<start or ship.year!=data['year'] or start[:4]!=str(data['year']))):
+        ship=rules.day(original.get('shipped'))
+        if not ship:error('매칭할 수출신고필증의 선적일을 입력하세요.')
+        elif not rules.day(start) or ship.isoformat()<start:error('선적일은 선별일보다 이전일 수 없습니다.')
+        if not (facility['data']['valid_from']<=start<=end and (not facility['data'].get('valid_to') or end<=facility['data']['valid_to'])):error('시설 지정 유효기간과 선별기간을 확인하세요.')
+        if start<data['start'] or end>data['end']:
             if not item['period_reason']:error('대상 기간·사업연도 밖 연결은 귀속 확인 사유가 필요합니다.')
             else:warnings.append('기간·연도 차이를 사용자 사유로 확인한 참고 계산입니다.')
         diff=abs(a-b);tolerance=[]

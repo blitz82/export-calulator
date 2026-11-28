@@ -279,7 +279,7 @@ function SubmissionWorkspace({org,fields}: {org:Org;fields?:Record<'members'|'li
       }))} fields={{subject:'회원사명 또는 신고번호',field:'항목',message:'보완 내용'}} editLabel="수정하기"
         editLink={row=>row.member_id ? `/members?row=${row.member_id}&return=${returnTo}` :
           row.row_id ? `/lines?row=${row.row_id}&return=${returnTo}` : undefined}/>}
-      {result.checks.some(problem=>problem.code==='D090'||problem.code==='D092')&&<p role="alert">계약 관계 확인이 필요하여 최종 확정할 수 없습니다. <NavLink to="/contracts">계약서 등록 확인</NavLink></p>}
+      {result.checks.some(problem=>['D090','D091','D092'].includes(problem.code))&&<p role="alert">계약 관계 확인이 필요하여 최종 확정할 수 없습니다. <NavLink to="/contracts">계약서 등록 확인</NavLink></p>}
       <p>신고 기준 실수출액 <b>{formatNumber(result.actual_usd)} USD</b> · 회원사 귀속 인정액 <b>{formatNumber(result.attributed_usd)} USD</b>
         {result.actual_kg!==null&&result.actual_kg!=='0'&&<> · 신고 기준 순중량 <b>{formatNumber(result.actual_kg)} kg</b></>}</p>
       <details className="compact" open={result.ready}><summary>회원사별 실적</summary>
@@ -383,14 +383,14 @@ function RunWorkspace({org,mode,fields}: {org:Org;mode:string;fields?:Record<'me
 }
 
 function Help() {
-  return <section className="panel guide"><h2>공동정산 업무 순서</h2><ol>
-    <li><NavLink to="/settings">프로그램 설정</NavLink>에서 품목을 등록하고 연도별 회원 기준일, 귀속일, 대상 HS코드를 저장합니다.</li>
-    <li><NavLink to="/members">회원사 명부</NavLink>에서 명부를 등록합니다. 역할 사업자는 사업자번호와 등록 이름 또는 별칭으로 대조합니다.</li>
-    <li><NavLink to="/lines">신고 원장</NavLink>에 신고필증을 등록합니다. 한 신고에 품목란이 여러 개이거나 정정 신고라면 해당 항목을 펼쳐 원본 값을 확인하세요.</li>
-    <li><NavLink to="/submission">제출자료</NavLink>에서 실적 연도를 선택하고 현재 자료를 검토합니다. 보완할 건을 수정하고 회원사별 실적을 확인한 뒤 제출용 Excel을 확정합니다.</li>
-  </ol><h2>인정 기준</h2><p>대행자와 화주는 직접수출 자격, 제조자는 간접수출 자격을 가집니다. 같은 사업자가 두 자격을 갖는 경우 직접수출을 한 번 인정합니다.</p>
-  <p>동일 신고 품목란의 실제 수출액은 한 번 집계합니다. 서로 다른 회원사에는 해당 역할에 따른 실적이 각각 귀속됩니다.</p>
-  <p><a href="/oss/index.html" target="_blank" rel="noreferrer">오픈소스 소프트웨어 정보</a></p></section>
+  return <section className="panel guide"><h2>처음 한 번 준비할 정보</h2><p>회원사 명부 → 계약 PDF와 원문 확인 → 공동선별장 → 해당 연도 지원기준을 확인하세요. 기존 자료는 재사용합니다.</p><h2>공동선별비 정산·지급보고 순서</h2><ol>
+    <li><NavLink to="/sorting-records">선별기록·증빙 등록</NavLink>에서 PDF를 보고 생산자·선별일·수출용 물량을 입력합니다. OCR과 항목별 근거 문구는 필수가 아닙니다.</li>
+    <li><NavLink to="/lines">수출신고필증 등록</NavLink>에서 신고 내용을 입력합니다. 차단 사유는 해당 행에서 보완하세요.</li>
+    <li><NavLink to="/settlement-work">공동선별비 정산·제출</NavLink>에서 정산월과 작업을 선택하고 선별기록·신고 후보를 목록으로 연결합니다. 다음 달·다음 해 선적도 가능하지만 선별일 이전 선적은 허용하지 않습니다.</li>
+    <li>지원액 확인 단계에서 단가·지원기준·잔량·차이를 검토한 후 연결을 확정합니다. 계산 확정은 실제 지급 승인이 아닙니다.</li>
+    <li>월별 보고에 내부검토·지출결의·실제 지급을 기록합니다. 단일 회원사 전액 거래는 배분액을 제안받고 원문과 확인합니다.</li>
+    <li>필수 점검을 해결하고 제출본을 보존합니다. PDF·원본 ZIP을 내려받고 실제 제출 후 제출일·방법을 기록하세요.</li>
+  </ol><h2>회원사별 연간 수출실적</h2><p><NavLink to="/settings">조직·실적 기준</NavLink>에서 연도별 정책을 확인하고 <NavLink to="/submission">회원사별 수출실적</NavLink>에서 전년도·선택 연도를 검토한 뒤 Excel을 확정합니다. 공동선별비 정산과 별도 업무입니다.</p><h2>상태의 의미</h2><dl><div><dt>초안·임시 저장</dt><dd>입력 보관 상태이며 물량 예약·최종 확정이 아닙니다.</dd></div><div><dt>확인 완료 계약</dt><dd>PDF 원문 확인과 근거 지정이 끝난 계약입니다. 실제 날짜의 유효기간도 충족해야 확정에 사용할 수 있습니다.</dd></div><div><dt>연결 준비 완료</dt><dd>선별기록을 매칭할 수 있는 상태입니다. 지원 적격·지급 완료를 뜻하지 않습니다.</dd></div><div><dt>연결 확정</dt><dd>물량 사용과 당시 참고 계산을 보존합니다.</dd></div><div><dt>제출본 보존 / 제출 기록</dt><dd>파일을 고정한 상태와 실제 외부에 제출한 사실을 각각 기록합니다.</dd></div></dl><h2>숫자·입력 복구</h2><p>쉼표는 천 단위, 점은 소수점입니다. 예: 1,234.56. 모호한 붙여넣기 값은 오류를 확인하세요. 빈 값은 미확인, 0은 명시적인 0입니다. 다른 화면으로 이동하기 전 저장하거나 계속 작성을 선택하세요.</p></section>
 }
 
 function MenuLink({item:[path,label,description]}: {item:typeof menus[number]}) {
@@ -452,7 +452,7 @@ function App() {
         <div className="page-title"><h1>{label}</h1></div>
         {path==='/'&&office.isSuccess&&!org?<Navigate to="/settings" replace/> :
           path==='/settings'?office.isSuccess&&<Settings org={org} choices={office.data.choices} refresh={refresh}/> : path==='/help'?<Help/> :
-          requiresOrg(org && (path==='/'?(sorting.data?.feature_enabled?<WorkspaceIntro/>:<Dashboard org={org}/>) : path==='/members'||path==='/lines' ?
+          requiresOrg(org && (path==='/'?(sorting.data?.feature_enabled?<WorkspaceIntro org={org.id}/>:<Dashboard org={org}/>) : path==='/members'||path==='/lines' ?
           (fields.data && <Suspense fallback={<p role="status">원장을 불러오는 중…</p>}>
             <LedgerGrid key={org.id+path} org={org.id} kind={path==='/members'?'members':'lines'}
               fields={fields.data[path==='/members'?'members':'lines']}/>

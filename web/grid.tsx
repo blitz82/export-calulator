@@ -1,3 +1,5 @@
+import {useWorkflowDirty} from './workflow'
+import {NumberInput} from './number-input'
 import { NavLink } from 'react-router-dom'
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
@@ -49,6 +51,7 @@ const extraLineFields = new Set(['accepted','country','product','fob','kg','quan
 const lineDecisionFields = ['scope','status']
 const emptyChecks: Record<string,Problem[]> = {}
 const emptyRows: Row[] = []
+const requiredMemberFields=new Set(['name','number','kind','approved'])
 const numeric = new Set(['usd','fob','kg','quantity'])
 
 export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields: Fields}) {
@@ -63,7 +66,7 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
   const [params,setParams] = useSearchParams()
   const problemOnly = params.get('filter') === 'issues'
   const rowChecks = checks.data ?? emptyChecks
-  const contractBlocked=kind==='lines'&&Object.values(rowChecks).some(items=>items.some(p=>p.code==='D090'||p.code==='D092'))
+  const contractBlocked=kind==='lines'&&Object.values(rowChecks).some(items=>items.some(p=>['D090','D091','D092'].includes(p.code)))
   const rows = query.data ?? emptyRows
   const members = useQuery({queryKey:[`org/${org}/data/members`], queryFn:() => get<Row[]>(`org/${org}/data/members`), enabled:kind==='lines'})
   const [selected, setSelected] = useState<Row>()
@@ -85,6 +88,7 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
   const pdfButton = useRef<HTMLButtonElement>(null)
   const excelFile = useRef<HTMLInputElement>(null)
   const dirty = selected && Object.keys(fields).some(key => String(selected[key] ?? '') !== String(draft[key] ?? ''))
+  useWorkflowDirty('ledger',!!dirty,()=>save())
   const selectedPdf = selected && draft.pdf
   const comparingPdf = showPdf ? selectedPdf : undefined
   const visibleRows = useMemo(() => rows.filter(row=>{
@@ -171,7 +175,7 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
     openedRow.current = requestedId
     openRequestedRow(requestedId)
   }, [requestedId])
-  const action = async (fn: () => Promise<void>) => {
+  const action = async (fn: () => Promise<unknown>) => {
     setBusy(true)
     setMessage('')
     try { await fn() } catch (error) { setMessage(visibleError((error as Error).message)) }
@@ -207,14 +211,14 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
       setShowIdentity(true)
       setMessage('품목란 번호와 정정 버전을 확인한 후 저장하세요.')
       await validate(draft)
-      return
+      return false
     }
     const [result] = await send<Result[]>(path, [{id:draft.id, revision:draft.revision, values:values(draft)}])
     ++validation.current
     setIssues(result.issues)
     if (!result.row) {
       setMessage('오류 항목을 수정한 후 저장하세요.')
-      return
+      return false
     }
     const saved = {...result.row, pdf:draft.pdf}
     setDraft(saved)
@@ -223,6 +227,7 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
     const needsReview = kind==='lines' && result.issues.some(issue=>issue.severity!=='INFO')
     setMessage(needsReview ? '저장됨 · 보완이 필요한 항목이 남아 있습니다.' : '저장됨 · ' + new Date().toLocaleTimeString('ko-KR'))
     await reload()
+    return true
   }
   const upload = async (file: File) => {
     setIssueRows([])
@@ -262,8 +267,8 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
       }}/>
       <button className={selected?undefined:"primary"} disabled={busy} onClick={() => select()}>{kind==='lines'?'직접 입력':'회원사 추가'}</button>
     </div>
-    {params.get('return')?.startsWith('/submission?year=') &&
-      <NavLink className="button" to={params.get('return')!}>제출 검토로 돌아가기</NavLink>}
+    {params.get('return')?.startsWith('/')&&!params.get('return')?.startsWith('//') &&
+      <NavLink className="button" to={params.get('return')!}>이전 업무로 돌아가기</NavLink>}
     <details className="compact"><summary>열 표시</summary>
       <div className="checklist">{Object.entries(displayFields).map(([key,label]) => <label key={key}>
         <input type="checkbox" checked={!hidden.includes(key)} onChange={e => setHidden(e.target.checked ? hidden.filter(k => k!==key) : [...hidden,key])}/>
@@ -280,7 +285,7 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
       </div>)}
     </details>}
     <div className={`ledger-split${comparingPdf ? ' ledger-comparing-pdf' : ''}`}>
-    <div className="grid-shell ledger-grid" hidden={!!comparingPdf}><AgGridReact<Row> theme={kind==='members' ? memberTheme : theme} onGridReady={event => {grid.current=event.api}}
+    <div className="grid-shell ledger-grid" hidden={!!comparingPdf}><AgGridReact<Row> rowHeight={36} headerHeight={40} theme={kind==='members' ? memberTheme : theme} onGridReady={event => {grid.current=event.api}}
       rowData={visibleRows} columnDefs={columns} quickFilterText={search} loading={query.isLoading || (problemOnly && checks.isLoading)}
       tooltipShowDelay={0} tooltipHideDelay={0}
       getRowId={p => String(p.data.id)} defaultColDef={{sortable:true,resizable:true,filter:false,suppressHeaderMenuButton:true,suppressHeaderFilterButton:true}} onRowClicked={e => {if (!busy) select(e.data)}}
@@ -367,12 +372,12 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
               ? <p className="muted" key={key}>{fields[role+'_name']} · 회원사 명부 자동 대조 완료</p>
               : null
           }
-          return <div className="field-entry" key={key}><div className="field-caption"><label htmlFor={inputId}>{label}{kind==='lines'&&extraLineFields.has(key)?' (선택)':''}</label>
+          return <div className="field-entry" key={key}><div className="field-caption"><label htmlFor={inputId}>{label}{kind==='members'&&requiredMemberFields.has(key)?' (필수)':kind==='lines'&&extraLineFields.has(key)?' (선택)':''}</label>
             <HelpTip text={ledgerHelp(key,kind)??label}/></div>
             <div className="error-anchor">
-            {choices ? <select id={inputId} name={key} aria-describedby={problems.length?`${inputId}-error`:undefined} aria-invalid={!!problems.length} value={choices.includes(value)?value:''} onChange={e => change(e.target.value)}>
+            {choices ? <select aria-label={label} id={inputId} name={key} aria-describedby={problems.length?`${inputId}-error`:undefined} aria-invalid={!!problems.length} value={choices.includes(value)?value:''} onChange={e => change(e.target.value)}>
               <option value="">선택</option>{choices.map(item => <option key={item}>{item}</option>)}
-            </select> : <input id={inputId} name={key} title={kind==='lines'&&(key==='declared'||key==='shipped')?dateInputHelp:undefined} aria-describedby={problems.length?`${inputId}-error`:undefined} value={String(draft[key] ?? '')}
+            </select> : numeric.has(key) ? <NumberInput aria-label={label} id={inputId} name={key} value={String(draft[key]??'')} onChange={e=>change(e.target.value)} aria-invalid={!!problems.length} aria-describedby={problems.length?`${inputId}-error`:undefined}/> : <input aria-label={label} id={inputId} name={key} title={kind==='lines'&&(key==='declared'||key==='shipped')?dateInputHelp:undefined} aria-describedby={problems.length?`${inputId}-error`:undefined} value={String(draft[key] ?? '')}
               onChange={e => change(e.target.value)} onBlur={key==='line' ? e=>{
                 const formatted = formatLineNumber(e.currentTarget.value)
                 if (formatted!==e.currentTarget.value) change(formatted)
@@ -387,7 +392,7 @@ export function LedgerGrid({org, kind, fields}: {org: number; kind: Kind; fields
           </div>
           }
           const entries = Object.entries(displayFields)
-          if (kind!=='lines') return entries.map(renderField)
+          if (kind!=='lines') return <><p className="form-instructions">필수 4개 항목을 입력하세요. 주소·연락처 등은 선택 사항입니다.</p>{entries.filter(([key])=>requiredMemberFields.has(key)).map(renderField)}<details className="member-optional-fields" open={issues.some(p=>p.severity!=='INFO'&&!requiredMemberFields.has(p.field))}><summary>주소·연락처·추가 정보 (선택)</summary>{entries.filter(([key])=>!requiredMemberFields.has(key)).map(renderField)}</details></>
           return <>
             {showIdentity && <fieldset className="party-fields">
               <legend>품목란 번호와 정정 버전</legend>

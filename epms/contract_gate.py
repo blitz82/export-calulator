@@ -20,7 +20,7 @@ def evaluate(row, members, agreements):
         return member
     producer = confirmed('maker')
     if not producer or producer.get('kind') not in {'생산자','복수'}:
-        return [], []  # Existing manufacturer validation already blocks this case.
+        return [rules.issue('D091','maker','확정 차단: 제조자 회원사·사업자번호·명칭·역할을 먼저 확인해야 표준계약서 관계를 검증할 수 있습니다.')], []
     exporters = [m for role in ('owner','agent') if (m := confirmed(role))]
     # A producer acting as exporter needs no agreement with itself.
     if any(m['id'] == producer['id'] or rules.business_number(m['number']) == rules.business_number(producer['number']) for m in exporters):
@@ -34,12 +34,14 @@ def evaluate(row, members, agreements):
             continue
         if not any(m['id'] == agreement['exporter_id'] for m in exporters):
             continue
-        if mc.assess(agreement, day)['state'] == '유효':
+        if (mc.assess(agreement, day)['state'] == '유효'
+                and agreement['data'].get('review') == '확인 완료'
+                and agreement['data'].get('evidence_pages')):
             return [], [dict(producer_id=producer['id'], exporter_id=agreement['exporter_id'],
                 contract_id=agreement['id'], revision=agreement['revision'], reference=day)]
     names = ' / '.join(dict.fromkeys(m['name'] for m in exporters)) or '수출화주·수출대행사 회원사'
-    message = (f"확정 차단: 제조자 {producer['name']}와 {names} 중 한 업체와의 {day} 기준 유효한 계약을 찾을 수 없습니다. "
-               '계약서 등록에서 당사자·계약기간·해지 여부를 확인하세요. (선적일 우선, 없으면 신고일 기준)')
+    message = (f"확정 차단: 제조자 {producer['name']}와 {names} 중 한 업체와의 {day} 기준 유효하고 원문 확인이 완료된 계약을 찾을 수 없습니다. "
+               '계약서 등록에서 당사자·계약기간·해지 여부와 검토 상태(확인 완료)·원문 근거를 확인하세요. (선적일 우선, 없으면 신고일 기준)')
     return [rules.issue('D090','maker',message)], []
 
 

@@ -97,7 +97,7 @@ def test_budget_follows_member_across_two_facilities(env):
 def test_multi_producer_costs_are_not_reused_for_each_member(env):
     setup(env,formula='실비 한도');c=env[0]
     contract=c.get('/api/org/1/contracts').json()[0]
-    c.post('/api/org/1/contracts',json=dict(title='다른 생산자 계약',kind='공급',producer_id=3,exporter_id=2,document_id=contract['document_id'],signed='2025-01-01',start='2025-01-01',end='2027-12-31',reason='격리 검증')).raise_for_status()
+    c.post('/api/org/1/contracts',json=dict(title='다른 생산자 계약',kind='공급',review='확인 완료',evidence_pages={'parties':1},producer_id=3,exporter_id=2,document_id=contract['document_id'],signed='2025-01-01',start='2025-01-01',end='2027-12-31',reason='격리 검증')).raise_for_status()
     a,_=source(env,'600',name='생산자1');b,_=source(env,'400',name='생산자3',producer_id=3);d1=declaration(env,'600');d2=declaration(env,'400','002')
     line=c.get('/api/org/1/data/lines').json()[-1]
     c.post('/api/org/1/data/lines',json=[dict(id=d2,revision=line['revision'],reason='생산자 대조',values={k:str(v) for k,v in dict(line,maker=env[5][2]['number'],maker_name=env[5][2]['name']).items() if k not in {'id','revision','source','pdf'}})]).raise_for_status()

@@ -15,7 +15,7 @@ class Facility(BaseModel):
     operator:str=Field(default='',max_length=100)
     address:str=Field(default='',max_length=200)
     valid_from:str=Field(max_length=10)
-    valid_to:str=Field(max_length=10)
+    valid_to:str|None=Field(default=None,max_length=10)
     evidence_id:int
 
 class Revision(BaseModel):

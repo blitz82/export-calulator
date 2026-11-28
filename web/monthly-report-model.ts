@@ -32,3 +32,9 @@ export function selectedMembers(draft:ReportDraft,catalog:ReportCatalog):Member[
   }
   return [...map.values()].sort((a,b)=>a.name.localeCompare(b.name,'ko'))
 }
+
+export function suggestSingleAllocation(members:{member_id:number}[],allocations:Allocation[],previous:string,next:string):Allocation[]{
+  if(members.length!==1)return allocations
+  if(!allocations.length||(allocations.length===1&&allocations[0].member_id===members[0].member_id&&allocations[0].amount===previous))return [{member_id:members[0].member_id,amount:next}]
+  return allocations
+}

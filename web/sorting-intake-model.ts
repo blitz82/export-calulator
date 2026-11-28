@@ -25,3 +25,16 @@ export function ocrInput(field:string,value:string,unit:string):string|null{
   if(!sourceTon&&unit==='t'){if(amount%1000n)return null;amount/=1000n}
   const result=quantityText(amount);return quantityUnits(result)===null?null:result
 }
+
+export function intakeErrors(d:{start:string;end:string;period_type:string;producer_id:number|null;export_quantity:string;evidence:{file?:number;page?:number}[];change_reason:string},existing=false){
+  const errors:Record<string,string>={}
+  if(!d.start)errors.start='선별일을 입력해 주세요.'
+  if(d.period_type==='월별'&&!d.end)errors.end='선별 종료일을 입력해 주세요.'
+  else if(d.end&&d.end<d.start)errors.end='선별 종료일은 시작일 이후여야 합니다.'
+  if(!d.producer_id)errors.producer_id='수출신고필증의 제조자와 매칭할 생산자회원사를 선택해 주세요.'
+  if(d.export_quantity==='')errors.export_quantity='수출용 선별량을 입력해 주세요. 미확인과 0은 구분됩니다.'
+  else if(quantityUnits(d.export_quantity)===null)errors.export_quantity='수출용 선별량의 숫자 형식과 소수 자릿수를 확인해 주세요.'
+  if(!d.evidence.length||d.evidence.some(r=>!r.file))errors.evidence='확인한 PDF를 선택해 주세요.'
+  if(existing&&!d.change_reason.trim())errors.change_reason='수정 이유를 입력해 주세요.'
+  return errors
+}

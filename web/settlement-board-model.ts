@@ -24,8 +24,8 @@ export function sourceWeightTotal(batches:Batch[],balance?:ReturnType<typeof boa
   return [...groups.values()].reduce((sum,g)=>sum+(g.cap<0n?g.cap:g.sum<g.cap?g.sum:g.cap),0n)
 }
 export function candidateInfo(b:Batch|undefined,d:Declaration,remaining:bigint,start:string,end:string){
-  const day=d.shipped||d.declared||'',producer=!!b&&sameProducer(b,d),period=!!day&&(!start||day>=start)&&(!end||day<=end),sourceDay=b?.data.start||b?.data.work_date
-  return {recommended:producer&&period&&remaining>0n&&!d.errors.length,reasons:[producer?'동일 생산자':'생산자 확인',period?'대상 기간':'기간 확인',remaining>0n?'잔량 있음':'잔량 없음',d.errors.length?'검증 확인 필요':'등록·계약 검증 통과'],distance:sourceDay&&day?Math.abs(Date.parse(day)-Date.parse(sourceDay)):Infinity}
+  const day=d.shipped||'',producer=!!b&&sameProducer(b,d),sourceDay=b?.data.start||b?.data.work_date,period=!!day&&!!sourceDay&&day>=sourceDay
+  return {recommended:producer&&period&&remaining>0n&&!d.errors.length,reasons:[producer?'동일 생산자':'생산자 확인',period?'선별일 이후 선적':!day?'선적일 확인':'선별일·선적일 확인',remaining>0n?'잔량 있음':'잔량 없음',d.errors.length?'검증 확인 필요':'등록·계약 검증 통과'],distance:sourceDay&&day?Math.abs(Date.parse(day)-Date.parse(sourceDay)):Infinity}
 }
 export function proposeConnections(batches:Batch[],declarations:Declaration[],lines:Edge[],ids:number[],start:string,end:string){
   const state=boardBalances(batches,declarations,lines),proposed:Edge[]=[]
